@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
-import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import {
   Box,
@@ -16,7 +15,7 @@ import loginBg from "../assets/forge_login_background_img.png";
 
 export default function SignIn() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { signIn } = useAuth();
 
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
@@ -32,16 +31,12 @@ export default function SignIn() {
     setLoading(true);
 
     try {
-      const { data } = await axios.post(
-        `${import.meta.env.VITE_BACK_END_SERVER_URL}/api/auth/signin`,
-        formData,
-      );
-      login(data.token, data.user);
+      await signIn(formData);
       // navigate('/dashboard')
       //Navigate to workspace after signed in
       navigate("/projects");
     } catch (err) {
-      setError(err.response?.data?.message || "Something went wrong.");
+      setError(err?.message || "Something went wrong.");
     } finally {
       setLoading(false);
     }

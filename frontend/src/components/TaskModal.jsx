@@ -13,6 +13,8 @@ import Stack from "@mui/material/Stack";
 import Chip from "@mui/material/Chip";
 import Avatar from "@mui/material/Avatar";
 import Alert from "@mui/material/Alert";
+import { supabase } from "../lib/supabaseClient";
+import { getApiBaseUrl } from "../lib/apiBaseUrl";
 
 const VALIDATION_MESSAGE = "Please fill in compulsory field.";
 
@@ -40,32 +42,20 @@ export default function TaskModal({
 
   projectId,
 }) {
-  const [form, setForm] = React.useState(createEmptyForm);
+  const [form, setForm] = React.useState(() =>
+    selectedTask
+      ? {
+          title: selectedTask.title || "",
+          description: selectedTask.description || "",
+          assignees: selectedTask.assignees?.map((u) => u._id) || [],
+          type: selectedTask.type || "",
+          status: selectedTask.status || "",
+          priority: selectedTask.priority || "",
+        }
+      : createEmptyForm(),
+  );
   const [assigneePick, setAssigneePick] = React.useState("");
   const [formError, setFormError] = React.useState("");
-
-  React.useEffect(() => {
-    setFormError("");
-
-    if (selectedTask) {
-      setForm({
-        title: selectedTask.title || "",
-
-        description: selectedTask.description || "",
-
-        assignees: selectedTask.assignees?.map((u) => u._id) || [],
-
-        type: selectedTask.type || "",
-
-        status: selectedTask.status || "",
-
-        priority: selectedTask.priority || "",
-      });
-    } else {
-      setForm(createEmptyForm());
-    }
-    setAssigneePick("");
-  }, [selectedTask, open]);
 
   const handleClose = () => {
     setFormError("");
@@ -119,16 +109,17 @@ export default function TaskModal({
     setFormError("");
 
     try {
-      const token = localStorage.getItem("token");
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token;
       if (selectedTask) {
         const res = await fetch(
-          `${import.meta.env.VITE_BACK_END_SERVER_URL}/api/tasks/${selectedTask._id}`,
+          `${getApiBaseUrl()}/api/tasks/${selectedTask._id}`,
           {
             method: "PATCH",
 
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
 
             body: JSON.stringify(form),
@@ -144,13 +135,13 @@ export default function TaskModal({
         setTasks(updatedTasks);
       } else {
         const res = await fetch(
-          `${import.meta.env.VITE_BACK_END_SERVER_URL}/api/tasks`,
+          `${getApiBaseUrl()}/api/tasks`,
           {
             method: "POST",
 
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
 
             body: JSON.stringify({
@@ -174,12 +165,13 @@ export default function TaskModal({
 
   const handleDelete = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token;
       await fetch(
-        `${import.meta.env.VITE_BACK_END_SERVER_URL}/api/tasks/${selectedTask._id}`,
+        `${getApiBaseUrl()}/api/tasks/${selectedTask._id}`,
         {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
         },
       );
 

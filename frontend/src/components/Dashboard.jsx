@@ -16,7 +16,7 @@ import { useAuth } from "../context/AuthContext";
 import UserAvatar from "./UserAvatar";
 import forgeLogo from "../assets/FORGE.png";
 import { theme } from "../styles/theme";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const NAVIGATION = [
   {
@@ -41,6 +41,7 @@ function CustomToolbarActions() {
 function AccountSidebarPreview(props) {
   const { handleClick, open, mini } = props;
   const session = useSession();
+  if (!session?.user) return null;
   return (
     <Stack direction="column" p={0}>
       <Divider />
@@ -138,7 +139,7 @@ function SidebarFooterAccount({ mini }) {
 function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, loading, signOut } = useAuth();
 
   const router = useMemo(() => {
     return {
@@ -148,14 +149,24 @@ function Dashboard() {
     };
   }, [location, navigate]);
 
-  const userSession = {
-    user: {
-      name: `${user.firstName} ${user.lastName}`,
-      email: user.email,
-    },
-  };
+  const userSession = user
+    ? {
+        user: {
+          name: `${user.firstName} ${user.lastName}`,
+          email: user.email,
+        },
+      }
+    : null;
 
   const [session, setSession] = useState(userSession);
+
+  useEffect(() => {
+    setSession(userSession);
+  }, [userSession]);
+
+  if (loading) {
+    return null;
+  }
 
   return (
     <AppProvider
@@ -169,8 +180,9 @@ function Dashboard() {
       theme={theme}
       session={session}
       authentication={{
-        signOut: () => {
+        signOut: async () => {
           setSession(null);
+          await signOut();
           navigate("/signout");
         },
       }}

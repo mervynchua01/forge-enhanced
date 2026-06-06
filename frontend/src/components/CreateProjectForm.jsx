@@ -86,7 +86,6 @@ const CreateProjectForm = ({ onClose }) => {
       ...formData,
       projectTitle: normalizedTitle,
       projectKey: normalizedKey,
-      projectLead: user._id,
       members: formData.members.map((member) => member._id),
       targetDate: formData.targetDate
         ? formData.targetDate.format("YYYY-MM-DD")

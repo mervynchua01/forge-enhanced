@@ -1,17 +1,22 @@
-const Project = require("../models/project");
+const { supabaseAdmin } = require("../lib/supabase");
 
 const requireRole = (...allowedRoles) => async (req, res, next) => {
   try {
     const { projectId } = req.params;
     const userId = req.user.userId;
 
-    const project = await Project.findById(projectId);
-    if (!project) {
+    const { data: project, error } = await supabaseAdmin
+      .from("projects")
+      .select("id, project_lead, members")
+      .eq("id", projectId)
+      .single();
+
+    if (error || !project) {
       return res.status(404).json({ message: "Project not found." });
     }
 
-    const isAdmin = project.projectLead.toString() === userId;
-    const isMember = project.members.some((m) => m.toString() === userId);
+    const isAdmin = project.project_lead === userId;
+    const isMember = (project.members || []).some((m) => m === userId);
 
     const userRole = isAdmin ? "admin" : isMember ? "member" : null;
 

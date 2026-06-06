@@ -10,7 +10,6 @@ const {
   deleteProject,
   queryUser,
   queryProject,
-  getUserProjects,
   getProjectProgress,
   getProjectMembers,
 } = require("../controllers/projectsController");

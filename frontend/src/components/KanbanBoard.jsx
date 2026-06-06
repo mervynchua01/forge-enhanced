@@ -10,6 +10,8 @@ import { useState, useEffect } from "react";
 import { alpha, useTheme } from "@mui/material/styles";
 
 import TaskCard, { TaskCardPreview } from "./TaskCard";
+import { supabase } from "../lib/supabaseClient";
+import { getApiBaseUrl } from "../lib/apiBaseUrl";
 
 /** Prefer pointer position; fallback to card–column overlap (fixes column gaps + corner quirks). */
 function boardCollisionDetection(args) {
@@ -138,15 +140,16 @@ export default function KanbanBoard({ tasks, setTasks, onTaskClick }) {
     setTasks(updatedTasks);
 
     try {
-      const token = localStorage.getItem("token");
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token;
       await fetch(
-        `${import.meta.env.VITE_BACK_END_SERVER_URL}/api/tasks/${taskId}`,
+        `${getApiBaseUrl()}/api/tasks/${taskId}`,
         {
           method: "PATCH",
 
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
 
           body: JSON.stringify({

@@ -1,6 +1,13 @@
-const User = require("../models/user");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
+const { supabaseAdmin, supabaseAuth } = require("../lib/supabase");
+
+const mapUser = (row) => ({
+  _id: row.id,
+  username: row.username,
+  firstName: row.first_name,
+  lastName: row.last_name,
+  email: row.email,
+  role: row.role,
+});
 
 const signup = async (req, res) => {
   try {
@@ -19,35 +26,56 @@ const signup = async (req, res) => {
       return res.status(400).json({ message: "Password must be at least 6 characters." });
     }
 
-    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
-    if (existingUser) {
+    const { data: existing, error: existingError } = await supabaseAdmin
+      .from("users")
+      .select("id")
+      .or(`email.eq.${email},username.eq.${username}`)
+      .maybeSingle();
+
+    if (existingError) {
+      return res.status(500).json({ message: existingError.message });
+    }
+
+    if (existing) {
       return res.status(400).json({ message: "Username or email already taken." });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    const user = await User.create({
-      username,
-      firstName,
-      lastName,
+    const { data, error } = await supabaseAuth.auth.signUp({
       email,
-      password: hashedPassword,
+      password,
+      options: {
+        data: {
+          username,
+          first_name: firstName,
+          last_name: lastName,
+        },
+      },
     });
 
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-    });
+    if (error || !data?.user) {
+      return res.status(400).json({ message: error?.message || "Signup failed." });
+    }
+
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("users")
+      .insert({
+        id: data.user.id,
+        username,
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        role: "user",
+      })
+      .select("id, username, first_name, last_name, email, role")
+      .single();
+
+    if (profileError) {
+      return res.status(500).json({ message: profileError.message });
+    }
 
     return res.status(201).json({
-      token,
-      user: {
-        _id: user._id,
-        username: user.username,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-      },
+      token: data.session?.access_token || null,
+      user: mapUser(profile),
     });
   } catch (error) {
     return res.status(500).json({ message: error.message });
@@ -62,30 +90,28 @@ const signin = async (req, res) => {
       return res.status(400).json({ message: "Email and password are required." });
     }
 
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ message: "Invalid email or password." });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ message: "Invalid email or password." });
-    }
-
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
+    const { data, error } = await supabaseAuth.auth.signInWithPassword({
+      email,
+      password,
     });
 
+    if (error || !data?.session) {
+      return res.status(401).json({ message: error?.message || "Invalid email or password." });
+    }
+
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("users")
+      .select("id, username, first_name, last_name, email, role")
+      .eq("id", data.user.id)
+      .single();
+
+    if (profileError) {
+      return res.status(500).json({ message: profileError.message });
+    }
+
     return res.status(200).json({
-      token,
-      user: {
-        _id: user._id,
-        username: user.username,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-      },
+      token: data.session.access_token,
+      user: mapUser(profile),
     });
   } catch (error) {
     return res.status(500).json({ message: error.message });

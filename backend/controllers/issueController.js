@@ -1,61 +1,148 @@
-const Task = require ("../models/task")
-const mongoose = require("mongoose")
+const { supabaseAdmin } = require("../lib/supabase");
 
-exports.createTask = async (req,res) => {
-    try {
-        const newTask = new Task({
-            ...req.body,
-            createdBy: new mongoose.Types.ObjectId("69d9aebcf689d13dd0d4882a")
-        });
+const mapUser = (row) => ({
+  _id: row.id,
+  username: row.username,
+  firstName: row.first_name,
+  lastName: row.last_name,
+  email: row.email,
+  role: row.role,
+});
 
-        const savedTask = await newTask.save();
-        res.status(201).json(savedTask);
-    } catch (error){
-        res.status(400).json({ message: error.message });
-    }
+const mapTask = (row, userById) => ({
+  _id: row.id,
+  title: row.title,
+  description: row.description,
+  type: row.type,
+  status: row.status,
+  priority: row.priority,
+  dueDate: row.due_date,
+  project: row.project_id,
+  assignees: (row.assignees || []).map((id) => userById.get(id)).filter(Boolean),
+  createdBy: row.created_by,
+  comment: row.comment || [],
+});
+
+const fetchUsersByIds = async (ids) => {
+  const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+  if (uniqueIds.length === 0) return new Map();
+
+  const { data, error } = await supabaseAdmin
+    .from("users")
+    .select("id, username, first_name, last_name, email, role")
+    .in("id", uniqueIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return new Map((data || []).map((user) => [user.id, mapUser(user)]));
 };
 
-exports.getTasksByProject = async (req,res) => {
-    try {
-        const tasks = await Task.find({ project: req.params.projectId })
-            .populate("assignees", "username")
-            .sort({ createdAt: -1 })
-        res.json(tasks);
-    } catch (error) {
-        res.status(500).json({ message: error.message })
+exports.createTask = async (req, res) => {
+  try {
+    const { data: task, error } = await supabaseAdmin
+      .from("tasks")
+      .insert({
+        title: req.body.title,
+        description: req.body.description,
+        type: req.body.type,
+        status: req.body.status,
+        priority: req.body.priority,
+        due_date: req.body.dueDate || null,
+        project_id: req.body.project,
+        assignees: req.body.assignees || [],
+        created_by: req.user.userId,
+        comment: req.body.comment || [],
+      })
+      .select("*")
+      .single();
+
+    if (error) {
+      return res.status(400).json({ message: error.message });
     }
-}
 
-exports.deleteTask = async (req,res) => {
-    try {
-        const task = await Task.findById(req.params.id);
-        if (!task) return res.status(404).json({ message: "Task not found" });
+    const userById = await fetchUsersByIds(task.assignees || []);
 
-        if (
-            task.assignees[0]?.toString() !==
-            req.user.userId
-        ) {
-            return res.status(403).json({ message: "Only the creator can delete this task" })
-        }
+    return res.status(201).json(mapTask(task, userById));
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+};
 
-        await Task.findByIdAndDelete(req.params.id);
-        res.json({ message: "Task deleted successfully" })
+exports.getTasksByProject = async (req, res) => {
+  try {
+    const { data: tasks, error } = await supabaseAdmin
+      .from("tasks")
+      .select("*")
+      .eq("project_id", req.params.projectId)
+      .order("created_at", { ascending: false });
 
-    } catch (error) {
-        res.status(500).json({ message: error.message })
+    if (error) {
+      return res.status(500).json({ message: error.message });
     }
-}
+
+    const ids = (tasks || []).flatMap((task) => task.assignees || []);
+    const userById = await fetchUsersByIds(ids);
+
+    return res.json((tasks || []).map((task) => mapTask(task, userById)));
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+exports.deleteTask = async (req, res) => {
+  try {
+    const { data: task, error: taskError } = await supabaseAdmin
+      .from("tasks")
+      .select("id, created_by")
+      .eq("id", req.params.id)
+      .single();
+
+    if (taskError || !task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    if (task.created_by && task.created_by !== req.user.userId) {
+      return res
+        .status(403)
+        .json({ message: "Only the creator can delete this task" });
+    }
+
+    await supabaseAdmin.from("tasks").delete().eq("id", req.params.id);
+
+    return res.json({ message: "Task deleted successfully" });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
 
 exports.updateTask = async (req, res) => {
   try {
-    const updated = await Task.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true }
-    );
+    const updates = {};
+    if (req.body.title !== undefined) updates.title = req.body.title;
+    if (req.body.description !== undefined) updates.description = req.body.description;
+    if (req.body.type !== undefined) updates.type = req.body.type;
+    if (req.body.status !== undefined) updates.status = req.body.status;
+    if (req.body.priority !== undefined) updates.priority = req.body.priority;
+    if (req.body.dueDate !== undefined) updates.due_date = req.body.dueDate || null;
+    if (req.body.assignees !== undefined) updates.assignees = req.body.assignees || [];
 
-    res.json(updated);
+    const { data: task, error } = await supabaseAdmin
+      .from("tasks")
+      .update(updates)
+      .eq("id", req.params.id)
+      .select("*")
+      .single();
+
+    if (error || !task) {
+      return res.status(500).json({ message: error?.message || "Task update failed" });
+    }
+
+    const userById = await fetchUsersByIds(task.assignees || []);
+
+    return res.json(mapTask(task, userById));
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 };

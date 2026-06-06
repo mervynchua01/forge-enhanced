@@ -1,27 +1,19 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import { useAuth } from "../context/AuthContext";
-import { Box, Typography, Button } from "@mui/material";
 
 export default function SignOut() {
-  const { user, token, logout } = useAuth();
+  const { signOut } = useAuth();
   const navigate = useNavigate();
 
-  const handleSignOut = async () => {
-    try {
-      await axios.post(
-        `${import.meta.env.VITE_BACK_END_SERVER_URL}/api/auth/signout`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-    } catch {
-      // sign out locally regardless
-    } finally {
-      logout();
+  useEffect(() => {
+    const run = async () => {
+      await signOut();
       navigate("/signin");
-    }
-  };
-  handleSignOut();
+    };
+
+    run();
+  }, [navigate, signOut]);
 
   // return (
   //   <Box

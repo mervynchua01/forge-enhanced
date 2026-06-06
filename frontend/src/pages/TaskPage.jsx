@@ -1,16 +1,44 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import Box from "@mui/material/Box";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogActions from "@mui/material/DialogActions";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import Stack from "@mui/material/Stack";
+import TextField from "@mui/material/TextField";
+import Alert from "@mui/material/Alert";
+import Divider from "@mui/material/Divider";
 import dayjs from "dayjs";
 
 import KanbanBoard from "../components/KanbanBoard";
 import TaskModal from "../components/TaskModal";
 import { getProjectDetails } from "../services/projectSpaceService";
-import api from "../services/api";
+import { createAgentTask } from "../services/agentTasksService";
+import { getApiBaseUrl } from "../lib/apiBaseUrl";
+import { supabase } from "../lib/supabaseClient";
+
+// Split the PRD into a few simple draft tickets for the MVP.
+const makeDraftTickets = (prdText) => {
+  const lines = prdText
+    .split(/[\n\.]/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+
+  const tickets = lines.length > 0 ? lines : [prdText.trim()];
+
+  return tickets.map((line, index) => ({
+    title: index === 0 ? "Review PRD and confirm scope" : `Draft ticket ${index + 1}`,
+    description: line,
+    acceptance_criteria: ["User can review the draft", "User can confirm the draft to create tasks"],
+    type: index === 0 ? "Feature" : "Improvement",
+    priority: index === 0 ? "High" : "Medium",
+  }));
+};
 
 export default function TaskPage() {
   const { projectId } = useParams();
@@ -20,6 +48,15 @@ export default function TaskPage() {
   const [open, setOpen] = useState(false);
   const [selectedTask, setSelectedTask] =
     useState(null);
+  const [taskModalKey, setTaskModalKey] = useState(0);
+  const [openPrdImport, setOpenPrdImport] = useState(false);
+  const [prdText, setPrdText] = useState("");
+  const [prdImportError, setPrdImportError] = useState("");
+  const [prdImportSuccess, setPrdImportSuccess] = useState("");
+  const [isSubmittingPrd, setIsSubmittingPrd] = useState(false);
+  const [agentTaskId, setAgentTaskId] = useState("");
+  const [draftTickets, setDraftTickets] = useState([]);
+  const [isConfirmingDraft, setIsConfirmingDraft] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,44 +78,176 @@ export default function TaskPage() {
   }, [projectId]);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    fetch(
-      `${import.meta.env.VITE_BACK_END_SERVER_URL}/api/tasks/${projectId}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    )
-      .then((res) => res.json())
-      .then((data) => setTasks(data))
-      .catch(console.error);
+    let cancelled = false;
+
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token;
+      const res = await fetch(
+        `${getApiBaseUrl()}/api/tasks/${projectId}`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        },
+      );
+      const payload = await res.json();
+      if (!cancelled) setTasks(payload);
+    })().catch(console.error);
+
+    return () => {
+      cancelled = true;
+    };
   }, [projectId]);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    let cancelled = false;
 
-    fetch(
-      `${import.meta.env.VITE_BACK_END_SERVER_URL}/api/projects/${projectId}/members`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token;
+
+      const res = await fetch(
+        `${getApiBaseUrl()}/api/projects/${projectId}/members`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
         },
-      }
-    )
-      .then((res) => res.json())
-      .then((data) => setMembers(data));
+      );
+      const payload = await res.json();
+      if (!cancelled) setMembers(payload);
+    })().catch(console.error);
+
+    return () => {
+      cancelled = true;
+    };
   }, [projectId]);
 
 
   const handleCreateTask = () => {
     setSelectedTask(null);
+    setTaskModalKey((current) => current + 1);
 
     setOpen(true);
   };
 
   const handleTaskClick = (task) => {
     setSelectedTask(task);
+    setTaskModalKey((current) => current + 1);
 
     setOpen(true);
+  };
+
+  // Reset the import state each time the modal opens.
+  const handleOpenPrdImport = () => {
+    setPrdImportError("");
+    setPrdImportSuccess("");
+    setAgentTaskId("");
+    setDraftTickets([]);
+    setOpenPrdImport(true);
+  };
+
+  const handleClosePrdImport = () => {
+    setOpenPrdImport(false);
+    setPrdImportError("");
+    setPrdImportSuccess("");
+    setAgentTaskId("");
+    setDraftTickets([]);
+  };
+
+  // Store the PRD on the server and build the preview draft locally.
+  const handleSubmitPrd = async () => {
+    if (!prdText.trim()) {
+      setPrdImportError("Paste a PRD before importing.");
+      return;
+    }
+
+    setIsSubmittingPrd(true);
+    setPrdImportError("");
+    setPrdImportSuccess("");
+
+    try {
+      const response = await createAgentTask(projectId, prdText.trim());
+      const agentTask = response?.data?.agentTask;
+      const drafts = makeDraftTickets(prdText.trim());
+
+      setAgentTaskId(agentTask?.id || "");
+      setDraftTickets(drafts);
+
+      setPrdImportSuccess(
+        agentTask
+          ? `Draft ready for review. Agent task ${agentTask.id} is storing the PRD.`
+          : "Draft ready for review.",
+      );
+    } catch (err) {
+      const message = err?.response?.data?.message || "PRD import failed.";
+      setPrdImportError(message);
+    } finally {
+      setIsSubmittingPrd(false);
+    }
+  };
+
+  // Save the draft to the board once the user is happy with it.
+  const handleConfirmDraft = async () => {
+    if (!agentTaskId || draftTickets.length === 0) {
+      setPrdImportError("Generate a draft before confirming.");
+      return;
+    }
+
+    setIsConfirmingDraft(true);
+    setPrdImportError("");
+
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token;
+
+      const draftResponse = await fetch(
+        `${getApiBaseUrl()}/api/agent-tasks/${agentTaskId}/draft`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ draftTickets }),
+        },
+      );
+
+      if (!draftResponse.ok) {
+        const payload = await draftResponse.json();
+        throw new Error(payload?.message || "Failed to save draft.");
+      }
+
+      const confirmResponse = await fetch(
+        `${getApiBaseUrl()}/api/agent-tasks/${agentTaskId}/confirm`,
+        {
+          method: "POST",
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        },
+      );
+
+      if (!confirmResponse.ok) {
+        const payload = await confirmResponse.json();
+        throw new Error(payload?.message || "Failed to confirm draft.");
+      }
+
+      const refreshed = await fetch(
+        `${getApiBaseUrl()}/api/tasks/${projectId}`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        },
+      );
+      const payload = await refreshed.json();
+      setTasks(payload);
+
+      setPrdImportSuccess("Draft confirmed and added to the board.");
+      setPrdText("");
+      setDraftTickets([]);
+      setAgentTaskId("");
+    } catch (err) {
+      setPrdImportError(err?.message || "Failed to confirm draft.");
+    } finally {
+      setIsConfirmingDraft(false);
+    }
   };
 
   const projectTitle =
@@ -126,6 +295,15 @@ export default function TaskPage() {
             sx={{ ml: "auto", flexShrink: 0 }}
           >
             + Create Task
+          </Button>
+
+          <Button
+            variant="outlined"
+            color="primary"
+            onClick={handleOpenPrdImport}
+            sx={{ flexShrink: 0 }}
+          >
+            Import PRD
           </Button>
         </Box>
 
@@ -210,6 +388,7 @@ export default function TaskPage() {
       </Box>
 
       <TaskModal
+        key={`${taskModalKey}-${selectedTask?._id || "new"}`}
         open={open}
         setOpen={setOpen}
         selectedTask={selectedTask}
@@ -218,6 +397,78 @@ export default function TaskPage() {
         members={members}
         projectId={projectId}
       />
+
+      <Dialog open={openPrdImport} onClose={handleClosePrdImport} fullWidth maxWidth="md">
+        <DialogTitle>Import PRD</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Paste the PRD here to create a lightweight draft, review the generated tickets, then confirm them onto the board.
+            </Typography>
+
+            {prdImportError ? <Alert severity="error">{prdImportError}</Alert> : null}
+            {prdImportSuccess ? <Alert severity="success">{prdImportSuccess}</Alert> : null}
+
+            <TextField
+              label="PRD text"
+              value={prdText}
+              onChange={(e) => setPrdText(e.target.value)}
+              multiline
+              minRows={12}
+              fullWidth
+              placeholder="Paste the full PRD here..."
+            />
+
+            {draftTickets.length > 0 ? (
+              <>
+                <Divider />
+                <Stack spacing={1.5}>
+                  <Typography variant="subtitle1" fontWeight={700}>
+                    Draft preview
+                  </Typography>
+                  {draftTickets.map((ticket, index) => (
+                    <Box
+                      key={`${ticket.title}-${index}`}
+                      sx={{
+                        border: "1px solid",
+                        borderColor: "divider",
+                        borderRadius: 2,
+                        p: 1.5,
+                        bgcolor: "background.paper",
+                      }}
+                    >
+                      <Typography variant="subtitle2" fontWeight={700}>
+                        {ticket.title}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {ticket.description}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {ticket.type} · {ticket.priority}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Stack>
+              </>
+            ) : null}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClosePrdImport} disabled={isSubmittingPrd}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmitPrd} variant="outlined" disabled={isSubmittingPrd}>
+            {isSubmittingPrd ? "Generating..." : "Generate Draft"}
+          </Button>
+          <Button
+            onClick={handleConfirmDraft}
+            variant="contained"
+            disabled={isConfirmingDraft || draftTickets.length === 0}
+          >
+            {isConfirmingDraft ? "Confirming..." : "Confirm Draft"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

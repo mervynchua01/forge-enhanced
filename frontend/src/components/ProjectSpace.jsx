@@ -200,13 +200,17 @@ const ProjectSpace = () => {
 
                   <AvatarGroup
                     max={4}
-                    total={project.members.length + 1}
+                    total={(project.members?.length || 0) + 1}
                     sx={{ justifyContent: "flex-end", mt: 1 }}
                   >
                     <UserAvatar
-                      name={`${project.projectLead.firstName} ${project.projectLead.lastName}`}
+                      name={
+                        project.projectLead
+                          ? `${project.projectLead.firstName} ${project.projectLead.lastName}`
+                          : "Project lead"
+                      }
                     />
-                    {project.members.map((member) => (
+                    {(project.members || []).map((member) => (
                       <UserAvatar
                         key={member._id}
                         name={`${member.firstName} ${member.lastName}`}

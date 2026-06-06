@@ -1,64 +1,121 @@
-const express = require("express");
-// const router = express.Router();
-const Project = require("../models/project");
-const User = require("../models/user");
-const Task = require("../models/task");
+const { supabaseAdmin } = require("../lib/supabase");
+
+const mapUser = (row) => ({
+  _id: row.id,
+  username: row.username,
+  firstName: row.first_name,
+  lastName: row.last_name,
+  email: row.email,
+  role: row.role,
+});
+
+const mapProject = (row, userById) => ({
+  _id: row.id,
+  projectTitle: row.project_title,
+  projectKey: row.project_key,
+  description: row.description,
+  projectLead: row.project_lead ? userById.get(row.project_lead) : null,
+  members: (row.members || []).map((id) => userById.get(id)).filter(Boolean),
+  targetDate: row.target_date,
+  status: row.status,
+});
+
+const fetchUsersByIds = async (ids) => {
+  const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+  if (uniqueIds.length === 0) return new Map();
+
+  const { data, error } = await supabaseAdmin
+    .from("users")
+    .select("id, username, first_name, last_name, email, role")
+    .in("id", uniqueIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return new Map((data || []).map((user) => [user.id, mapUser(user)]));
+};
 
 const createProject = async (req, res) => {
   const {
     projectTitle,
     projectKey,
     description,
-    projectLead,
     members,
     targetDate,
     status,
   } = req.body;
+
   try {
     if (
       !projectTitle ||
       !projectKey ||
       !description ||
-      !projectLead ||
       !targetDate ||
       !status
     ) {
       return res.status(400).json({ message: "Missing required project info" });
     }
 
-    const project = await Project.create({
-      projectTitle,
-      projectKey,
-      description,
-      projectLead,
-      members: members || [],
-      targetDate,
-      status,
-    });
+    const { data: project, error } = await supabaseAdmin
+      .from("projects")
+      .insert({
+        project_title: projectTitle,
+        project_key: projectKey,
+        description,
+        project_lead: req.user.userId,
+        members: members || [],
+        target_date: targetDate,
+        status,
+      })
+      .select("*")
+      .single();
 
-    res.status(201).json({ message: "Project created successfully", project });
-  } catch (err) {
-    if (err.code === 11000) {
-      return res
-        .status(400)
-        .json({
+    if (error) {
+      if (error.code === "23505") {
+        return res.status(400).json({
           message: "Project Title or Key already exists.",
-          duplicate: err.keyPattern || null,
-          value: err.keyValue || null,
+          duplicate: error.details || null,
         });
+      }
+      return res.status(500).json({ err: error.message });
     }
-    res.status(500).json({ err });
+
+    const userById = await fetchUsersByIds([
+      project.project_lead,
+      ...(project.members || []),
+    ]);
+
+    return res.status(201).json({
+      message: "Project created successfully",
+      project: mapProject(project, userById),
+    });
+  } catch (err) {
+    return res.status(500).json({ err: err.message });
   }
 };
 
 const getAllProjects = async (req, res) => {
   try {
-    const projects = await Project.find({})
-      .populate("projectLead", "firstName lastName")
-      .populate("members", "firstName lastName");
-    res.status(200).json({ projects });
+    const { data: projects, error } = await supabaseAdmin
+      .from("projects")
+      .select("*");
+
+    if (error) {
+      return res.status(500).json({ err: error.message });
+    }
+
+    const ids = (projects || []).flatMap((project) => [
+      project.project_lead,
+      ...(project.members || []),
+    ]);
+    const userById = await fetchUsersByIds(ids);
+
+    return res.status(200).json({
+      projects: (projects || []).map((project) => mapProject(project, userById)),
+    });
   } catch (err) {
-    res.status(500).json({ err: err.message });
+    return res.status(500).json({ err: err.message });
   }
 };
 
@@ -66,154 +123,219 @@ const getProjects = async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    const projects = await Project.find({
-      $or: [{ projectLead: userId }, { members: userId }],
-    })
-      .populate("projectLead", "firstName lastName")
-      .populate("members", "firstName lastName");
-    res.status(200).json({ projects });
+    const { data: projects, error } = await supabaseAdmin
+      .from("projects")
+      .select("*")
+      .or(`project_lead.eq.${userId},members.cs.{${userId}}`);
+
+    if (error) {
+      return res.status(500).json({ err: error.message });
+    }
+
+    const ids = (projects || []).flatMap((project) => [
+      project.project_lead,
+      ...(project.members || []),
+    ]);
+    const userById = await fetchUsersByIds(ids);
+
+    return res.status(200).json({
+      projects: (projects || []).map((project) => mapProject(project, userById)),
+    });
   } catch (err) {
-    res.status(500).json({ err: err.message });
+    return res.status(500).json({ err: err.message });
   }
 };
 
 const getProjectById = async (req, res) => {
   try {
     const projectId = req.params.projectId;
-    console.log("backend", projectId);
-    const project = await Project.findById(projectId)
-      .populate("projectLead", "firstName lastName")
-      .populate("members", "firstName lastName");
 
-    if (!project) {
+    const { data: project, error } = await supabaseAdmin
+      .from("projects")
+      .select("*")
+      .eq("id", projectId)
+      .single();
+
+    if (error || !project) {
       return res.status(404).json({ message: "Project not found." });
     }
-    res.status(200).json({ project });
+
+    const userById = await fetchUsersByIds([
+      project.project_lead,
+      ...(project.members || []),
+    ]);
+
+    return res.status(200).json({
+      project: mapProject(project, userById),
+    });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
-};
-
-//query fitler
-const queryFilter = (queryParams) => {
-  const { search } = queryParams;
-  if (!search) return;
-
-  return {
-    $or: [
-      { firstName: { $regex: search, $options: "i" } },
-      { lastName: { $regex: search, $options: "i" } },
-    ],
-  };
 };
 
 const queryProject = async (req, res) => {
   try {
-    const query = queryFilter(req.query);
-    const project = await Project.find({ projectLead: query })
-      .populate("projectLead", "firstName lastName")
-      .populate("members", "firstName lastName");
-    res.status(200).json({ project });
+    const { search } = req.query;
+    if (!search) {
+      return res.status(200).json({ project: [] });
+    }
+
+    const { data: projects, error } = await supabaseAdmin
+      .from("projects")
+      .select("*")
+      .or(`project_title.ilike.%${search}%,project_key.ilike.%${search}%`);
+
+    if (error) {
+      return res.status(500).json({ message: error.message });
+    }
+
+    const ids = (projects || []).flatMap((project) => [
+      project.project_lead,
+      ...(project.members || []),
+    ]);
+    const userById = await fetchUsersByIds(ids);
+
+    return res.status(200).json({
+      project: (projects || []).map((project) => mapProject(project, userById)),
+    });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 };
 
 const queryUser = async (req, res) => {
   try {
-    const query = queryFilter(req.query);
-    const users = await User.find(query).limit(10);
-    res.status(200).json(users);
+    const { search } = req.query;
+    if (!search) {
+      return res.status(200).json([]);
+    }
+
+    const { data: users, error } = await supabaseAdmin
+      .from("users")
+      .select("id, username, first_name, last_name, email, role")
+      .or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%`)
+      .limit(10);
+
+    if (error) {
+      return res.status(500).json({ message: error.message });
+    }
+
+    return res.status(200).json((users || []).map(mapUser));
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 };
 
 const editProject = async (req, res) => {
   try {
     const { projectId } = req.params;
-    const { projectTitle, projectKey, description, members, targetDate } =
+    const { projectTitle, projectKey, description, members, targetDate, status } =
       req.body;
 
     const memberIds = members ? members.map((m) => m._id || m) : undefined;
 
-    const updatedProject = await Project.findByIdAndUpdate(
-      projectId,
-      {
-        projectTitle,
-        projectKey,
-        description,
-        members: memberIds,
-        targetDate,
-      },
-      {
-        new: true,
-        runValidators: true,
-      },
-    )
-      .populate("projectLead")
-      .populate("members");
+    const updates = {};
+    if (projectTitle !== undefined) updates.project_title = projectTitle;
+    if (projectKey !== undefined) updates.project_key = projectKey;
+    if (description !== undefined) updates.description = description;
+    if (memberIds !== undefined) updates.members = memberIds;
+    if (targetDate !== undefined) updates.target_date = targetDate;
+    if (status !== undefined) updates.status = status;
 
-    if (!updatedProject) {
+    const { data: project, error } = await supabaseAdmin
+      .from("projects")
+      .update(updates)
+      .eq("id", projectId)
+      .select("*")
+      .single();
+
+    if (error || !project) {
       return res.status(404).json({ message: "Project not found." });
     }
-    res.json({ message: "Proejct updated.", project: updatedProject });
+
+    const userById = await fetchUsersByIds([
+      project.project_lead,
+      ...(project.members || []),
+    ]);
+
+    return res.json({
+      message: "Project updated.",
+      project: mapProject(project, userById),
+    });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 };
 
 const deleteProject = async (req, res) => {
   try {
     const projectId = req.params.projectId;
-    const deletedProject = await Project.findByIdAndDelete(projectId);
-    if (!deletedProject) {
+    const { data, error } = await supabaseAdmin
+      .from("projects")
+      .delete()
+      .eq("id", projectId)
+      .select("id")
+      .single();
+
+    if (error || !data) {
       return res.status(404).json({ message: "Project not found." });
     }
-    res.status(200).send({ message: "Project deleted!" });
+
+    return res.status(200).send({ message: "Project deleted!" });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 };
 
 const getProjectProgress = async (req, res) => {
   const { projectId } = req.params;
   try {
-    const tasks = await Task.find({ project: projectId }).populate("status");
-    const totalTasks = tasks.length;
-    const completedTasks = tasks.filter((t) => t.status === "Done").length;
+    const { data: tasks, error } = await supabaseAdmin
+      .from("tasks")
+      .select("status")
+      .eq("project_id", projectId);
 
-    res.status(200).json({
+    if (error) {
+      return res.status(500).json({ message: error.message });
+    }
+
+    const totalTasks = (tasks || []).length;
+    const completedTasks = (tasks || []).filter((t) => t.status === "Done").length;
+
+    return res.status(200).json({
       completed: completedTasks,
       total: totalTasks,
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 };
+
 const getProjectMembers = async (req, res) => {
   try {
-    const project = await Project.findById(req.params.projectId)
-      .populate("members", "username")
-      .populate("projectLead", "username");
+    const { data: project, error } = await supabaseAdmin
+      .from("projects")
+      .select("project_lead, members")
+      .eq("id", req.params.projectId)
+      .single();
 
-    if (!project) {
+    if (error || !project) {
       return res.status(404).json({ message: "Project not found" });
     }
 
-    const allMembers = [project.projectLead, ...project.members];
+    const ids = [project.project_lead, ...(project.members || [])];
+    const userById = await fetchUsersByIds(ids);
+
+    const allMembers = ids.map((id) => userById.get(id)).filter(Boolean);
 
     const uniqueMembers = allMembers.filter(
       (member, index, self) =>
-        index ===
-        self.findIndex((m) => m._id.toString() === member._id.toString()),
+        index === self.findIndex((m) => m._id === member._id),
     );
 
-    res.json(uniqueMembers);
+    return res.json(uniqueMembers);
   } catch (err) {
-    res.status(500).json({
-      message: err.message,
-    });
+    return res.status(500).json({ message: err.message });
   }
 };
 
