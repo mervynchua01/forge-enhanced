@@ -37,10 +37,21 @@ export function AuthProvider({ children }) {
 
     if (error) throw error;
 
-    const profile = await loadProfile(data.user.id);
-    setSession(data.session);
-    setUser(profile);
-    return profile;
+    // If no users row exists yet (e.g. account predates migration), seed one now.
+    const existing = await loadProfile(data.user.id);
+    if (!existing) {
+      const meta = data.user.user_metadata || {};
+      await supabase.from("users").upsert({
+        id: data.user.id,
+        username: meta.username || data.user.email,
+        first_name: meta.first_name || "",
+        last_name: meta.last_name || "",
+        email: data.user.email,
+        role: "user",
+      });
+    }
+
+    // onAuthStateChange handles setSession/setUser — no duplicate call needed here.
   };
 
   const signUp = async ({ email, password, username, firstName, lastName }) => {

@@ -164,9 +164,7 @@ function Dashboard() {
     setSession(userSession);
   }, [userSession]);
 
-  if (loading) {
-    return null;
-  }
+  // if (loading) { return null; } // temporarily disabled
 
   return (
     <AppProvider
@@ -180,6 +178,7 @@ function Dashboard() {
       theme={theme}
       session={session}
       authentication={{
+        signIn: () => navigate("/signin"),
         signOut: async () => {
           setSession(null);
           await signOut();

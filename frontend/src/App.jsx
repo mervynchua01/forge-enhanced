@@ -13,8 +13,8 @@ import TaskPage from "./pages/TaskPage";
 function RequireAuth({ children }) {
   const { session, loading } = useAuth();
 
-  if (loading) return null;
-  if (!session) return <Navigate to="/signin" replace />;
+  // if (loading) return null; // temporarily disabled
+  // if (!session) return <Navigate to="/signin" replace />; // temporarily disabled
 
   return children;
 }

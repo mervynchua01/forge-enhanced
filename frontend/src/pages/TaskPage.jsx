@@ -21,24 +21,19 @@ import { createAgentTask } from "../services/agentTasksService";
 import { getApiBaseUrl } from "../lib/apiBaseUrl";
 import { supabase } from "../lib/supabaseClient";
 
-// Split the PRD into a few simple draft tickets for the MVP.
-const makeDraftTickets = (prdText) => {
-  const lines = prdText
-    .split(/[\n\.]/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .slice(0, 3);
-
-  const tickets = lines.length > 0 ? lines : [prdText.trim()];
-
-  return tickets.map((line, index) => ({
-    title: index === 0 ? "Review PRD and confirm scope" : `Draft ticket ${index + 1}`,
-    description: line,
-    acceptance_criteria: ["User can review the draft", "User can confirm the draft to create tasks"],
-    type: index === 0 ? "Feature" : "Improvement",
-    priority: index === 0 ? "High" : "Medium",
-  }));
+const getTokenWithTimeout = async () => {
+  try {
+    const timeout = new Promise((resolve) => setTimeout(resolve, 2000));
+    const { data } = await Promise.race([
+      supabase.auth.getSession(),
+      timeout.then(() => ({ data: null })),
+    ]);
+    return data?.session?.access_token || null;
+  } catch {
+    return null;
+  }
 };
+
 
 export default function TaskPage() {
   const { projectId } = useParams();
@@ -81,8 +76,7 @@ export default function TaskPage() {
     let cancelled = false;
 
     (async () => {
-      const { data } = await supabase.auth.getSession();
-      const token = data?.session?.access_token;
+      const token = await getTokenWithTimeout();
       const res = await fetch(
         `${getApiBaseUrl()}/api/tasks/${projectId}`,
         {
@@ -102,9 +96,7 @@ export default function TaskPage() {
     let cancelled = false;
 
     (async () => {
-      const { data } = await supabase.auth.getSession();
-      const token = data?.session?.access_token;
-
+      const token = await getTokenWithTimeout();
       const res = await fetch(
         `${getApiBaseUrl()}/api/projects/${projectId}/members`,
         {
@@ -166,14 +158,14 @@ export default function TaskPage() {
     try {
       const response = await createAgentTask(projectId, prdText.trim());
       const agentTask = response?.data?.agentTask;
-      const drafts = makeDraftTickets(prdText.trim());
+      const drafts = response?.data?.draftTickets ?? [];
 
       setAgentTaskId(agentTask?.id || "");
       setDraftTickets(drafts);
 
       setPrdImportSuccess(
-        agentTask
-          ? `Draft ready for review. Agent task ${agentTask.id} is storing the PRD.`
+        drafts.length > 0
+          ? `${drafts.length} tickets generated. Review them below, then confirm to add to the board.`
           : "Draft ready for review.",
       );
     } catch (err) {
@@ -195,8 +187,7 @@ export default function TaskPage() {
     setPrdImportError("");
 
     try {
-      const { data } = await supabase.auth.getSession();
-      const token = data?.session?.access_token;
+      const token = await getTokenWithTimeout();
 
       const draftResponse = await fetch(
         `${getApiBaseUrl()}/api/agent-tasks/${agentTaskId}/draft`,
@@ -230,10 +221,11 @@ export default function TaskPage() {
         throw new Error(payload?.message || "Failed to confirm draft.");
       }
 
+      const refreshToken = await getTokenWithTimeout();
       const refreshed = await fetch(
         `${getApiBaseUrl()}/api/tasks/${projectId}`,
         {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          headers: refreshToken ? { Authorization: `Bearer ${refreshToken}` } : {},
         },
       );
       const payload = await refreshed.json();

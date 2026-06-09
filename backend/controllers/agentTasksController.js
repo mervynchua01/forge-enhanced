@@ -1,5 +1,6 @@
 const { supabaseAdmin } = require("../lib/supabase");
 const { ticketsSchema } = require("../validation/ticketSchemas");
+const { generateDraftTickets } = require("../lib/llm");
 
 // Input limits and retention defaults for PRD intake.
 const MAX_PRD_CHARS = 50000;
@@ -120,8 +121,63 @@ exports.createAgentTask = async (req, res) => {
       return res.status(500).json({ message: error?.message || "Create failed." });
     }
 
-    // Return the created task in a stable response shape.
-    return res.status(201).json({ agentTask: mapAgentTask(agentTask) });
+    // Call Claude to generate draft tickets from the PRD text.
+    let rawTickets;
+    try {
+      rawTickets = await generateDraftTickets(prdText);
+    } catch (llmError) {
+      // Mark the task as failed so the frontend can show a useful error.
+      await supabaseAdmin
+        .from("agent_tasks")
+        .update({ state: "cancelled", updated_at: new Date().toISOString() })
+        .eq("id", agentTask.id);
+      return res.status(502).json({ message: `LLM error: ${llmError.message}` });
+    }
+
+    // Attach provenance fields and validate the shape Claude returned.
+    const normalized = normalizeDraftTickets(rawTickets, agentTask.id);
+    const { tickets, error: validationError } = await validateWithRetry(
+      normalized,
+      async () => {
+        // On the first Zod failure, ask Claude to fix its own output.
+        const fixed = await generateDraftTickets(
+          `${prdText}\n\nIMPORTANT: Your previous response failed JSON schema validation. Return only a valid JSON array matching the required schema.`,
+        );
+        return normalizeDraftTickets(fixed, agentTask.id);
+      },
+    );
+
+    if (validationError) {
+      await supabaseAdmin
+        .from("agent_tasks")
+        .update({ state: "cancelled", updated_at: new Date().toISOString() })
+        .eq("id", agentTask.id);
+      return res.status(422).json({
+        message: "Claude returned tickets that failed validation after retry.",
+        errors: validationError.flatten(),
+      });
+    }
+
+    // Persist the validated tickets and advance the state machine.
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from("agent_tasks")
+      .update({
+        draft_tickets: tickets,
+        state: "draft_ready",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", agentTask.id)
+      .select("*")
+      .single();
+
+    if (updateError || !updated) {
+      return res.status(500).json({ message: updateError?.message || "Failed to save draft tickets." });
+    }
+
+    return res.status(201).json({
+      agentTask: mapAgentTask(updated),
+      draftTickets: tickets,
+    });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }

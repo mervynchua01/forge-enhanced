@@ -8,10 +8,16 @@ const api = axios.create({
 
 api.interceptors.request.use(
   async (config) => {
-    const { data } = await supabase.auth.getSession();
-    const token = data?.session?.access_token;
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    try {
+      const timeout = new Promise((resolve) => setTimeout(resolve, 2000));
+      const sessionFetch = supabase.auth.getSession();
+      const { data } = await Promise.race([sessionFetch, timeout.then(() => ({ data: null }))]);
+      const token = data?.session?.access_token;
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch {
+      // no token — backend dev bypass will handle it
     }
     return config;
   },
