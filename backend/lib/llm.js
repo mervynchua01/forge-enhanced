@@ -1,4 +1,5 @@
 const Anthropic = require("@anthropic-ai/sdk");
+const { REFINEMENT_TOOLS, executeTool } = require("./refinementTools");
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -65,4 +66,91 @@ const generateDraftTickets = async (prdText) => {
   return JSON.parse(raw);
 };
 
-module.exports = { generateDraftTickets };
+const REFINEMENT_SYSTEM_PROMPT = (draftTickets) =>
+  `You are a helpful assistant that refines engineering ticket drafts based on user instructions.
+
+Use the provided tools to make precise edits to the draft. After completing all changes, write a short summary (1–3 sentences) describing what you did.
+
+Current draft tickets:
+${JSON.stringify(draftTickets, null, 2)}
+
+Each ticket has a "draft_id" — use it as the identifier in every tool call.`;
+
+/**
+ * Run one conversational refinement turn with full agentic tool-use loop.
+ * `turns` is the stored chat_history array (each element has { snapshot_before, messages }).
+ * Returns { updatedDraft, turnMessages, assistantText }.
+ */
+const refineTickets = async (turns, draftTickets, userMessage) => {
+  // Replay all previous turn messages so Claude has full conversation context.
+  const messages = [];
+  for (const turn of turns) {
+    for (const msg of turn.messages) {
+      messages.push(msg);
+    }
+  }
+  messages.push({ role: "user", content: userMessage });
+
+  let currentDraft = [...draftTickets];
+  // Track messages added this turn for storage.
+  const turnMessages = [{ role: "user", content: userMessage }];
+
+  // Agentic loop: keep going until Claude stops requesting tool calls.
+  while (true) {
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5",
+      max_tokens: 4096,
+      system: REFINEMENT_SYSTEM_PROMPT(currentDraft),
+      messages,
+      tools: REFINEMENT_TOOLS,
+    });
+
+    const assistantMsg = { role: "assistant", content: response.content };
+    messages.push(assistantMsg);
+    turnMessages.push(assistantMsg);
+
+    if (response.stop_reason !== "tool_use") break;
+
+    // Execute each tool call and collect results.
+    const toolResults = [];
+    for (const block of response.content) {
+      if (block.type !== "tool_use") continue;
+
+      try {
+        const { draft: updatedDraft, result } = executeTool(
+          block.name,
+          block.input,
+          currentDraft,
+        );
+        currentDraft = updatedDraft;
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: block.id,
+          content: JSON.stringify(result),
+        });
+      } catch (err) {
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: block.id,
+          content: err.message,
+          is_error: true,
+        });
+      }
+    }
+
+    const toolResultMsg = { role: "user", content: toolResults };
+    messages.push(toolResultMsg);
+    turnMessages.push(toolResultMsg);
+  }
+
+  // Extract the final text summary Claude wrote.
+  const lastAssistant = [...turnMessages].reverse().find((m) => m.role === "assistant");
+  const assistantText = (Array.isArray(lastAssistant?.content) ? lastAssistant.content : [])
+    .filter((b) => b.type === "text")
+    .map((b) => b.text)
+    .join("\n");
+
+  return { updatedDraft: currentDraft, turnMessages, assistantText };
+};
+
+module.exports = { generateDraftTickets, refineTickets };

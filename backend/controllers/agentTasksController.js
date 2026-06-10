@@ -1,6 +1,7 @@
 const { supabaseAdmin } = require("../lib/supabase");
 const { ticketsSchema } = require("../validation/ticketSchemas");
-const { generateDraftTickets } = require("../lib/llm");
+const { generateDraftTickets, refineTickets } = require("../lib/llm");
+const { ensureIds } = require("../lib/refinementTools");
 
 // Input limits and retention defaults for PRD intake.
 const MAX_PRD_CHARS = 50000;
@@ -357,6 +358,138 @@ exports.confirmAgentTask = async (req, res) => {
       agentTask: mapAgentTask(updated),
       createdTasks,
     });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+// Run one conversational refinement turn against the current draft.
+exports.chatAgentTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { message } = req.body;
+
+    if (!message || typeof message !== "string" || !message.trim()) {
+      return res.status(400).json({ message: "message is required." });
+    }
+
+    const { data: agentTask, error } = await supabaseAdmin
+      .from("agent_tasks")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error || !agentTask) {
+      return res.status(404).json({ message: "Agent task not found." });
+    }
+
+    const { data: project, error: projectError } = await supabaseAdmin
+      .from("projects")
+      .select("id, project_lead, members")
+      .eq("id", agentTask.project_id)
+      .single();
+
+    if (projectError || !project) {
+      return res.status(404).json({ message: "Project not found." });
+    }
+
+    if (!isProjectMember(project, req.user.userId)) {
+      return res.status(403).json({ message: "Not authorized." });
+    }
+
+    if (!["draft_ready", "refining"].includes(agentTask.state)) {
+      return res
+        .status(400)
+        .json({ message: `Cannot refine in state: ${agentTask.state}.` });
+    }
+
+    const rawDraft = Array.isArray(agentTask.draft_tickets) ? agentTask.draft_tickets : [];
+    const draftWithIds = ensureIds(rawDraft);
+    const turns = Array.isArray(agentTask.chat_history) ? agentTask.chat_history : [];
+
+    const { updatedDraft, turnMessages, assistantText } = await refineTickets(
+      turns,
+      draftWithIds,
+      message.trim(),
+    );
+
+    const newTurn = { snapshot_before: draftWithIds, messages: turnMessages };
+
+    const { error: updateError } = await supabaseAdmin
+      .from("agent_tasks")
+      .update({
+        draft_tickets: updatedDraft,
+        chat_history: [...turns, newTurn],
+        state: "refining",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+
+    if (updateError) {
+      return res.status(500).json({ message: updateError.message });
+    }
+
+    return res.json({ draftTickets: updatedDraft, message: assistantText });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+// Revert the most recent refinement turn.
+exports.undoAgentTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { data: agentTask, error } = await supabaseAdmin
+      .from("agent_tasks")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error || !agentTask) {
+      return res.status(404).json({ message: "Agent task not found." });
+    }
+
+    const { data: project, error: projectError } = await supabaseAdmin
+      .from("projects")
+      .select("id, project_lead, members")
+      .eq("id", agentTask.project_id)
+      .single();
+
+    if (projectError || !project) {
+      return res.status(404).json({ message: "Project not found." });
+    }
+
+    if (!isProjectMember(project, req.user.userId)) {
+      return res.status(403).json({ message: "Not authorized." });
+    }
+
+    const turns = Array.isArray(agentTask.chat_history) ? agentTask.chat_history : [];
+
+    if (turns.length === 0) {
+      return res.status(400).json({ message: "Nothing to undo." });
+    }
+
+    const lastTurn = turns[turns.length - 1];
+    const restoredDraft = lastTurn.snapshot_before;
+    const newTurns = turns.slice(0, -1);
+    const newState = newTurns.length === 0 ? "draft_ready" : "refining";
+
+    const { error: updateError } = await supabaseAdmin
+      .from("agent_tasks")
+      .update({
+        draft_tickets: restoredDraft,
+        chat_history: newTurns,
+        state: newState,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+
+    if (updateError) {
+      return res.status(500).json({ message: updateError.message });
+    }
+
+    return res.json({ draftTickets: restoredDraft });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }

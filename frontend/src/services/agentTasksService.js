@@ -1,6 +1,10 @@
 import api from "./api";
 
-// Create a new PRD generation task for the current project.
-export const createAgentTask = (projectId, prdText) => {
-  return api.post("/agent-tasks", { projectId, prdText });
-};
+export const createAgentTask = (projectId, prdText) =>
+  api.post("/agent-tasks", { projectId, prdText });
+
+export const chatAgentTask = (id, message) =>
+  api.post(`/agent-tasks/${id}/chat`, { message });
+
+export const undoAgentTask = (id) =>
+  api.post(`/agent-tasks/${id}/undo`);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import Box from "@mui/material/Box";
 import Dialog from "@mui/material/Dialog";
@@ -7,17 +7,21 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
+import IconButton from "@mui/material/IconButton";
 import Chip from "@mui/material/Chip";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Alert from "@mui/material/Alert";
 import Divider from "@mui/material/Divider";
+import CircularProgress from "@mui/material/CircularProgress";
+import UndoIcon from "@mui/icons-material/Undo";
+import SendIcon from "@mui/icons-material/Send";
 import dayjs from "dayjs";
 
 import KanbanBoard from "../components/KanbanBoard";
 import TaskModal from "../components/TaskModal";
 import { getProjectDetails } from "../services/projectSpaceService";
-import { createAgentTask } from "../services/agentTasksService";
+import { createAgentTask, chatAgentTask, undoAgentTask } from "../services/agentTasksService";
 import { getApiBaseUrl } from "../lib/apiBaseUrl";
 import { supabase } from "../lib/supabaseClient";
 
@@ -52,6 +56,11 @@ export default function TaskPage() {
   const [agentTaskId, setAgentTaskId] = useState("");
   const [draftTickets, setDraftTickets] = useState([]);
   const [isConfirmingDraft, setIsConfirmingDraft] = useState(false);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isChatting, setIsChatting] = useState(false);
+  const [isUndoing, setIsUndoing] = useState(false);
+  const chatEndRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -127,12 +136,19 @@ export default function TaskPage() {
     setOpen(true);
   };
 
+  // Auto-scroll chat to bottom when new messages arrive.
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
+
   // Reset the import state each time the modal opens.
   const handleOpenPrdImport = () => {
     setPrdImportError("");
     setPrdImportSuccess("");
     setAgentTaskId("");
     setDraftTickets([]);
+    setChatMessages([]);
+    setChatInput("");
     setOpenPrdImport(true);
   };
 
@@ -142,6 +158,8 @@ export default function TaskPage() {
     setPrdImportSuccess("");
     setAgentTaskId("");
     setDraftTickets([]);
+    setChatMessages([]);
+    setChatInput("");
   };
 
   // Store the PRD on the server and build the preview draft locally.
@@ -173,6 +191,48 @@ export default function TaskPage() {
       setPrdImportError(message);
     } finally {
       setIsSubmittingPrd(false);
+    }
+  };
+
+  const handleSendChat = async () => {
+    const text = chatInput.trim();
+    if (!text || !agentTaskId || isChatting) return;
+
+    setChatInput("");
+    setChatMessages((prev) => [...prev, { role: "user", content: text }]);
+    setIsChatting(true);
+    setPrdImportError("");
+
+    try {
+      const response = await chatAgentTask(agentTaskId, text);
+      const { draftTickets: updated, message: reply } = response.data;
+      setDraftTickets(updated);
+      setChatMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+    } catch (err) {
+      const msg = err?.response?.data?.message || "Refinement failed.";
+      setPrdImportError(msg);
+      // Remove the optimistic user message on error.
+      setChatMessages((prev) => prev.slice(0, -1));
+    } finally {
+      setIsChatting(false);
+    }
+  };
+
+  const handleUndo = async () => {
+    if (!agentTaskId || isUndoing || chatMessages.length === 0) return;
+
+    setIsUndoing(true);
+    setPrdImportError("");
+
+    try {
+      const response = await undoAgentTask(agentTaskId);
+      setDraftTickets(response.data.draftTickets);
+      // Remove the last user + assistant message pair from the local chat display.
+      setChatMessages((prev) => prev.slice(0, -2));
+    } catch (err) {
+      setPrdImportError(err?.response?.data?.message || "Undo failed.");
+    } finally {
+      setIsUndoing(false);
     }
   };
 
@@ -390,75 +450,214 @@ export default function TaskPage() {
         projectId={projectId}
       />
 
-      <Dialog open={openPrdImport} onClose={handleClosePrdImport} fullWidth maxWidth="md">
+      <Dialog
+        open={openPrdImport}
+        onClose={handleClosePrdImport}
+        fullWidth
+        maxWidth={draftTickets.length > 0 ? "xl" : "md"}
+      >
         <DialogTitle>Import PRD</DialogTitle>
+
         <DialogContent>
-          <Stack spacing={2} sx={{ pt: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Paste the PRD here to create a lightweight draft, review the generated tickets, then confirm them onto the board.
-            </Typography>
-
-            {prdImportError ? <Alert severity="error">{prdImportError}</Alert> : null}
-            {prdImportSuccess ? <Alert severity="success">{prdImportSuccess}</Alert> : null}
-
-            <TextField
-              label="PRD text"
-              value={prdText}
-              onChange={(e) => setPrdText(e.target.value)}
-              multiline
-              minRows={12}
-              fullWidth
-              placeholder="Paste the full PRD here..."
-            />
-
-            {draftTickets.length > 0 ? (
-              <>
-                <Divider />
-                <Stack spacing={1.5}>
+          {draftTickets.length === 0 ? (
+            // Step 1: PRD input
+            <Stack spacing={2} sx={{ pt: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                Paste the PRD here to generate a draft. Once generated, you can refine tickets via chat before confirming them to the board.
+              </Typography>
+              {prdImportError ? <Alert severity="error">{prdImportError}</Alert> : null}
+              <TextField
+                label="PRD text"
+                value={prdText}
+                onChange={(e) => setPrdText(e.target.value)}
+                multiline
+                minRows={14}
+                fullWidth
+                placeholder="Paste the full PRD here..."
+              />
+            </Stack>
+          ) : (
+            // Step 2: two-panel refinement view
+            <Box sx={{ display: "flex", gap: 2, pt: 1, height: 560 }}>
+              {/* Left: draft ticket preview */}
+              <Box
+                sx={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  minWidth: 0,
+                }}
+              >
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    mb: 1,
+                  }}
+                >
                   <Typography variant="subtitle1" fontWeight={700}>
-                    Draft preview
+                    Draft preview ({draftTickets.length})
                   </Typography>
-                  {draftTickets.map((ticket, index) => (
+                  <IconButton
+                    size="small"
+                    onClick={handleUndo}
+                    disabled={isUndoing || chatMessages.length === 0}
+                    title="Undo last turn"
+                  >
+                    {isUndoing ? <CircularProgress size={16} /> : <UndoIcon fontSize="small" />}
+                  </IconButton>
+                </Box>
+
+                {prdImportError ? (
+                  <Alert severity="error" sx={{ mb: 1 }}>
+                    {prdImportError}
+                  </Alert>
+                ) : null}
+                {prdImportSuccess ? (
+                  <Alert severity="success" sx={{ mb: 1 }}>
+                    {prdImportSuccess}
+                  </Alert>
+                ) : null}
+
+                <Box sx={{ overflowY: "auto", flex: 1, pr: 0.5 }}>
+                  <Stack spacing={1.5}>
+                    {draftTickets.map((ticket, index) => (
+                      <Box
+                        key={ticket.draft_id || `${ticket.title}-${index}`}
+                        sx={{
+                          border: "1px solid",
+                          borderColor: "divider",
+                          borderRadius: 2,
+                          p: 1.5,
+                          bgcolor: "background.paper",
+                        }}
+                      >
+                        <Typography variant="subtitle2" fontWeight={700}>
+                          {ticket.title}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                          {ticket.description}
+                        </Typography>
+                        <Stack direction="row" spacing={0.5} sx={{ mt: 0.75 }}>
+                          <Chip label={ticket.type} size="small" variant="outlined" />
+                          <Chip label={ticket.priority} size="small" variant="outlined" />
+                        </Stack>
+                      </Box>
+                    ))}
+                  </Stack>
+                </Box>
+              </Box>
+
+              <Divider orientation="vertical" flexItem />
+
+              {/* Right: chat panel */}
+              <Box
+                sx={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  minWidth: 0,
+                }}
+              >
+                <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
+                  Refine with chat
+                </Typography>
+
+                {/* Message history */}
+                <Box
+                  sx={{
+                    flex: 1,
+                    overflowY: "auto",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 1,
+                    pr: 0.5,
+                    mb: 1,
+                  }}
+                >
+                  {chatMessages.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">
+                      Ask Claude to edit, split, merge, or reorder the draft tickets.
+                    </Typography>
+                  ) : null}
+                  {chatMessages.map((msg, i) => (
                     <Box
-                      key={`${ticket.title}-${index}`}
+                      key={i}
                       sx={{
-                        border: "1px solid",
-                        borderColor: "divider",
+                        alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+                        maxWidth: "85%",
+                        bgcolor: msg.role === "user" ? "primary.main" : "action.hover",
+                        color: msg.role === "user" ? "primary.contrastText" : "text.primary",
                         borderRadius: 2,
-                        p: 1.5,
-                        bgcolor: "background.paper",
+                        px: 1.5,
+                        py: 1,
                       }}
                     >
-                      <Typography variant="subtitle2" fontWeight={700}>
-                        {ticket.title}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {ticket.description}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {ticket.type} · {ticket.priority}
+                      <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                        {msg.content}
                       </Typography>
                     </Box>
                   ))}
-                </Stack>
-              </>
-            ) : null}
-          </Stack>
+                  {isChatting ? (
+                    <Box sx={{ alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 1 }}>
+                      <CircularProgress size={14} />
+                      <Typography variant="caption" color="text.secondary">
+                        Thinking...
+                      </Typography>
+                    </Box>
+                  ) : null}
+                  <div ref={chatEndRef} />
+                </Box>
+
+                {/* Chat input */}
+                <Box sx={{ display: "flex", gap: 1, alignItems: "flex-end" }}>
+                  <TextField
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendChat();
+                      }
+                    }}
+                    placeholder="e.g. Make all auth tickets High priority"
+                    multiline
+                    maxRows={4}
+                    fullWidth
+                    size="small"
+                    disabled={isChatting}
+                  />
+                  <IconButton
+                    onClick={handleSendChat}
+                    disabled={!chatInput.trim() || isChatting}
+                    color="primary"
+                  >
+                    <SendIcon />
+                  </IconButton>
+                </Box>
+              </Box>
+            </Box>
+          )}
         </DialogContent>
+
         <DialogActions>
-          <Button onClick={handleClosePrdImport} disabled={isSubmittingPrd}>
+          <Button onClick={handleClosePrdImport} disabled={isSubmittingPrd || isChatting}>
             Cancel
           </Button>
-          <Button onClick={handleSubmitPrd} variant="outlined" disabled={isSubmittingPrd}>
-            {isSubmittingPrd ? "Generating..." : "Generate Draft"}
-          </Button>
-          <Button
-            onClick={handleConfirmDraft}
-            variant="contained"
-            disabled={isConfirmingDraft || draftTickets.length === 0}
-          >
-            {isConfirmingDraft ? "Confirming..." : "Confirm Draft"}
-          </Button>
+          {draftTickets.length === 0 ? (
+            <Button onClick={handleSubmitPrd} variant="contained" disabled={isSubmittingPrd}>
+              {isSubmittingPrd ? "Generating..." : "Generate Draft"}
+            </Button>
+          ) : (
+            <Button
+              onClick={handleConfirmDraft}
+              variant="contained"
+              disabled={isConfirmingDraft || isChatting}
+            >
+              {isConfirmingDraft ? "Confirming..." : "Confirm to Board"}
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </Box>
