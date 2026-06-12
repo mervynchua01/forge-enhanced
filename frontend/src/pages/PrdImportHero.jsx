@@ -208,9 +208,17 @@ export default function PrdImportHero() {
         variant="h4"
         fontWeight={600}
         textAlign="center"
+        sx={{ mb: 1 }}
+      >
+        Start building your next product
+      </Typography>
+      <Typography
+        variant="body1"
+        color="text.secondary"
+        textAlign="center"
         sx={{ mb: 4 }}
       >
-        Turn your PRD into a board
+        Paste your PRD. We&apos;ll forge the tickets.
       </Typography>
 
       {error ? (
