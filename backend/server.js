@@ -9,7 +9,19 @@ import agentTasksRoutes from "./routes/agentTasksRoutes.js";
 
 const app = express();
 
-app.use(cors());
+// Restrict CORS to the configured frontend origin(s) in production. Set
+// FRONTEND_URL to a comma-separated list of allowed origins (e.g. your Vercel
+// URL). When unset, allow all origins so local development still works.
+const allowedOrigins = (process.env.FRONTEND_URL || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: allowedOrigins.length > 0 ? allowedOrigins : true,
+  }),
+);
 // Raise the body limit so base64-encoded PDF uploads (PRD imports) fit.
 app.use(express.json({ limit: "25mb" }));
 app.use(logger("dev"));
@@ -23,8 +35,9 @@ app.get("/test", (req, res) => {
 app.use("/api/auth", authRouter);
 app.use("/api/projects", projectRouter);
 
-app.listen(3000, () => {
-  console.log("The express app is ready!");
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`The express app is ready on port ${PORT}!`);
 });
 
 // ZOE: task routes — commented out until task.js model is fixed
