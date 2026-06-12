@@ -32,9 +32,8 @@ export default function SignIn() {
 
     try {
       await signIn(formData);
-      // navigate('/dashboard')
-      //Navigate to workspace after signed in
-      navigate("/projects");
+      // Land on the PRD import hero after signing in.
+      navigate("/home");
     } catch (err) {
       setError(err?.message || "Something went wrong.");
     } finally {

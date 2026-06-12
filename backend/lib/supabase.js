@@ -1,5 +1,5 @@
-const { createClient } = require("@supabase/supabase-js");
-const WebSocket = require("ws");
+import { createClient } from "@supabase/supabase-js";
+import WebSocket from "ws";
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -35,7 +35,4 @@ const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-module.exports = {
-  supabaseAdmin,
-  supabaseAuth,
-};
+export { supabaseAdmin, supabaseAuth };

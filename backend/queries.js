@@ -1,13 +1,12 @@
 //Run to create dummy data in MongoDB
 
-const dotenv = require("dotenv");
-dotenv.config();
-const mongoose = require("mongoose");
-const User = require("./models/user");
-const Project = require("./models/project");
-const Task = require("./models/task");
-const { faker } = require("@faker-js/faker");
-const bcrypt = require("bcrypt");
+import "dotenv/config";
+import mongoose from "mongoose";
+import User from "./models/user.js";
+import Project from "./models/project.js";
+import Task from "./models/task.js";
+import { faker } from "@faker-js/faker";
+import bcrypt from "bcrypt";
 
 const connect = async () => {
   await mongoose.connect(process.env.MONGODB_URI);
@@ -110,7 +109,7 @@ const runQueries = async () => {
 
       return {
         projectTitle: projectName[i],
-        projectKey: projectKey[i].toUpperCase(), // Added .toUpperCase() for standard key formatting
+        projectKey: projectKey[i].toUpperCase(),
         description: description[i],
         projectLead: lead._id,
         members: faker.helpers
@@ -187,6 +186,7 @@ const runQueries = async () => {
         }),
       });
     }
+    projIdx++;
   }
 
   await Task.insertMany(tasks);

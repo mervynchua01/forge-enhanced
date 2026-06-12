@@ -1,4 +1,4 @@
-const { supabaseAdmin } = require("../lib/supabase");
+import { supabaseAdmin } from "../lib/supabase.js";
 
 // DEV BYPASS — remove before deploying
 const DEV_BYPASS = true;
@@ -31,4 +31,4 @@ const verifyToken = async (req, res, next) => {
   return next();
 };
 
-module.exports = verifyToken;
+export default verifyToken;

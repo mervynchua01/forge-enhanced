@@ -1,5 +1,5 @@
 import axios from "axios";
-import { supabase } from "../lib/supabaseClient";
+import { getAccessToken } from "../lib/supabaseClient";
 import { getApiBaseUrl } from "../lib/apiBaseUrl";
 
 const api = axios.create({
@@ -7,17 +7,11 @@ const api = axios.create({
 });
 
 api.interceptors.request.use(
-  async (config) => {
-    try {
-      const timeout = new Promise((resolve) => setTimeout(resolve, 2000));
-      const sessionFetch = supabase.auth.getSession();
-      const { data } = await Promise.race([sessionFetch, timeout.then(() => ({ data: null }))]);
-      const token = data?.session?.access_token;
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    } catch {
-      // no token — backend dev bypass will handle it
+  (config) => {
+    // Read the cached token synchronously — no per-request getSession() stall.
+    const token = getAccessToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },

@@ -1,7 +1,7 @@
-const { supabaseAdmin } = require("../lib/supabase");
-const { ticketsSchema } = require("../validation/ticketSchemas");
-const { generateDraftTickets, refineTickets } = require("../lib/llm");
-const { ensureIds } = require("../lib/refinementTools");
+import { supabaseAdmin } from "../lib/supabase.js";
+import { ticketsSchema } from "../validation/ticketSchemas.js";
+import { generateDraftTickets, refineTickets } from "../lib/llm.js";
+import { ensureIds } from "../lib/refinementTools.js";
 
 // Input limits and retention defaults for PRD intake.
 const MAX_PRD_CHARS = 50000;
@@ -67,21 +67,22 @@ const mapDraftTicketToTask = (ticket, projectId, userId) => ({
 });
 
 // Create a new draft-generation task from a PRD submission.
-exports.createAgentTask = async (req, res) => {
+export const createAgentTask = async (req, res) => {
   try {
-    const { projectId, prdText } = req.body;
+    const { projectId, prdText, prdFileBase64, mimeType } = req.body;
 
     // Validate required inputs before any database work.
     if (!projectId || typeof projectId !== "string") {
       return res.status(400).json({ message: "projectId is required." });
     }
-    if (!prdText || typeof prdText !== "string") {
-      return res.status(400).json({ message: "prdText is required." });
+    // At least one of prdText or a PDF file must be provided.
+    const hasText = prdText && typeof prdText === "string" && prdText.trim().length > 0;
+    const hasPdf = prdFileBase64 && mimeType === "application/pdf";
+    if (!hasText && !hasPdf) {
+      return res.status(400).json({ message: "prdText or a PDF file is required." });
     }
-    if (prdText.length > MAX_PRD_CHARS) {
-      return res.status(400).json({
-        message: `PRD exceeds ${MAX_PRD_CHARS} characters.`,
-      });
+    if (hasText && prdText.length > MAX_PRD_CHARS) {
+      return res.status(400).json({ message: `PRD exceeds ${MAX_PRD_CHARS} characters.` });
     }
 
     // Load the project to enforce membership checks.
@@ -122,10 +123,10 @@ exports.createAgentTask = async (req, res) => {
       return res.status(500).json({ message: error?.message || "Create failed." });
     }
 
-    // Call Claude to generate draft tickets from the PRD text.
+    // Call Claude to generate draft tickets from the PRD text or uploaded file.
     let rawTickets;
     try {
-      rawTickets = await generateDraftTickets(prdText);
+      rawTickets = await generateDraftTickets(prdText, { prdFileBase64, mimeType });
     } catch (llmError) {
       // Mark the task as failed so the frontend can show a useful error.
       await supabaseAdmin
@@ -185,7 +186,7 @@ exports.createAgentTask = async (req, res) => {
 };
 
 // Fetch the current draft state for debugging and traceability.
-exports.getAgentTaskTrace = async (req, res) => {
+export const getAgentTaskTrace = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -223,7 +224,7 @@ exports.getAgentTaskTrace = async (req, res) => {
   }
 };
 
-exports.applyDraftTickets = async (req, res) => {
+export const applyDraftTickets = async (req, res) => {
   try {
     const { id } = req.params;
     const { draftTickets, retryDraftTickets } = req.body;
@@ -291,7 +292,7 @@ exports.applyDraftTickets = async (req, res) => {
 };
 
 // Copy the approved draft tickets into the live task board.
-exports.confirmAgentTask = async (req, res) => {
+export const confirmAgentTask = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -364,7 +365,7 @@ exports.confirmAgentTask = async (req, res) => {
 };
 
 // Run one conversational refinement turn against the current draft.
-exports.chatAgentTask = async (req, res) => {
+export const chatAgentTask = async (req, res) => {
   try {
     const { id } = req.params;
     const { message } = req.body;
@@ -436,7 +437,7 @@ exports.chatAgentTask = async (req, res) => {
 };
 
 // Revert the most recent refinement turn.
-exports.undoAgentTask = async (req, res) => {
+export const undoAgentTask = async (req, res) => {
   try {
     const { id } = req.params;
 

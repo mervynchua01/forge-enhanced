@@ -1,5 +1,5 @@
-const Anthropic = require("@anthropic-ai/sdk");
-const { REFINEMENT_TOOLS, executeTool } = require("./refinementTools");
+import Anthropic from "@anthropic-ai/sdk";
+import { REFINEMENT_TOOLS, executeTool } from "./refinementTools.js";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -39,19 +39,30 @@ ${TICKET_JSON_EXAMPLE}`;
 
 /**
  * Call Claude Haiku 4.5 with a PRD and return a raw parsed JSON array.
+ * Pass prdText for plain text, or prdFileBase64 + mimeType for an uploaded PDF.
  * Throws if the API call fails or the response is not valid JSON.
  */
-const generateDraftTickets = async (prdText) => {
+const generateDraftTickets = async (prdText, { prdFileBase64, mimeType } = {}) => {
+  // PDFs get a native document block so Claude reads the actual layout and
+  // structure rather than receiving lossy extracted text.
+  let userContent;
+  if (prdFileBase64 && mimeType === "application/pdf") {
+    userContent = [
+      {
+        type: "document",
+        source: { type: "base64", media_type: "application/pdf", data: prdFileBase64 },
+      },
+      { type: "text", text: "Convert this PRD document into structured engineering tickets." },
+    ];
+  } else {
+    userContent = `Here is the PRD. Convert it into structured engineering tickets:\n\n${prdText}`;
+  }
+
   const message = await client.messages.create({
     model: "claude-haiku-4-5",
     max_tokens: 4096,
     system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: `Here is the PRD. Convert it into structured engineering tickets:\n\n${prdText}`,
-      },
-    ],
+    messages: [{ role: "user", content: userContent }],
   });
 
   // Claude returns a list of content blocks. We want the first text block.
@@ -153,4 +164,4 @@ const refineTickets = async (turns, draftTickets, userMessage) => {
   return { updatedDraft: currentDraft, turnMessages, assistantText };
 };
 
-module.exports = { generateDraftTickets, refineTickets };
+export { generateDraftTickets, refineTickets };

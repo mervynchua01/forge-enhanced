@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const taskSchema = new mongoose.Schema(
   {
@@ -19,13 +19,13 @@ const taskSchema = new mongoose.Schema(
     status: {
       type: String,
       required: true,
-      enum: ["To Do", "In Progress", "In Review", "Done"], // 统一你的前端需求
+      enum: ["To Do", "In Progress", "In Review", "Done"],
       default: "To Do",
     },
     priority: {
       type: String,
       required: true,
-      enum: ["None", "Low", "Medium", "High", "Urgent"], // 增加了 None 和 Urgent
+      enum: ["None", "Low", "Medium", "High", "Urgent"],
       default: "None",
     },
     dueDate: {
@@ -61,4 +61,4 @@ const taskSchema = new mongoose.Schema(
 
 const Task = mongoose.model("Task", taskSchema);
 
-module.exports = Task;
+export default Task;

@@ -1,8 +1,7 @@
-const express = require("express");
-const router = express.Router();
-const verifyToken = require("../middleware/verifyToken");
-const requireRole = require("../middleware/requireRole");
-const {
+import express from "express";
+import verifyToken from "../middleware/verifyToken.js";
+import requireRole from "../middleware/requireRole.js";
+import {
   createProject,
   getProjects,
   getProjectById,
@@ -12,7 +11,9 @@ const {
   queryProject,
   getProjectProgress,
   getProjectMembers,
-} = require("../controllers/projectsController");
+} from "../controllers/projectsController.js";
+
+const router = express.Router();
 
 router.get("/query", verifyToken, queryUser);
 router.get("/", verifyToken, getProjects);
@@ -23,4 +24,4 @@ router.get("/:projectId/members", verifyToken, getProjectMembers);
 router.patch("/:projectId/edit", verifyToken, requireRole("admin"), editProject);
 // router.delete("/:projectId", verifyToken, requireRole("admin"), deleteProject);
 
-module.exports = router;
+export default router;

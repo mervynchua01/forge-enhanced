@@ -1,4 +1,4 @@
-const { randomUUID } = require("crypto");
+import { randomUUID } from "crypto";
 
 const REFINEMENT_TOOLS = [
   {
@@ -259,4 +259,4 @@ const executeTool = (name, input, draft) => {
   }
 };
 
-module.exports = { REFINEMENT_TOOLS, ensureIds, executeTool };
+export { REFINEMENT_TOOLS, ensureIds, executeTool };

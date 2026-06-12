@@ -1,4 +1,4 @@
-const { supabaseAdmin } = require("../lib/supabase");
+import { supabaseAdmin } from "../lib/supabase.js";
 
 const requireRole = (...allowedRoles) => async (req, res, next) => {
   try {
@@ -31,4 +31,4 @@ const requireRole = (...allowedRoles) => async (req, res, next) => {
   }
 };
 
-module.exports = requireRole;
+export default requireRole;

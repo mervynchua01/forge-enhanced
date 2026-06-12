@@ -1,4 +1,4 @@
-const { supabaseAdmin } = require("../lib/supabase");
+import { supabaseAdmin } from "../lib/supabase.js";
 
 const mapUser = (row) => ({
   _id: row.id,
@@ -39,7 +39,7 @@ const fetchUsersByIds = async (ids) => {
   return new Map((data || []).map((user) => [user.id, mapUser(user)]));
 };
 
-exports.createTask = async (req, res) => {
+export const createTask = async (req, res) => {
   try {
     const { data: task, error } = await supabaseAdmin
       .from("tasks")
@@ -70,7 +70,7 @@ exports.createTask = async (req, res) => {
   }
 };
 
-exports.getTasksByProject = async (req, res) => {
+export const getTasksByProject = async (req, res) => {
   try {
     const { data: tasks, error } = await supabaseAdmin
       .from("tasks")
@@ -91,7 +91,7 @@ exports.getTasksByProject = async (req, res) => {
   }
 };
 
-exports.deleteTask = async (req, res) => {
+export const deleteTask = async (req, res) => {
   try {
     const { data: task, error: taskError } = await supabaseAdmin
       .from("tasks")
@@ -117,7 +117,7 @@ exports.deleteTask = async (req, res) => {
   }
 };
 
-exports.updateTask = async (req, res) => {
+export const updateTask = async (req, res) => {
   try {
     const updates = {};
     if (req.body.title !== undefined) updates.title = req.body.title;

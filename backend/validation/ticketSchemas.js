@@ -1,4 +1,4 @@
-const { z } = require("zod");
+import { z } from "zod";
 
 const ticketSchema = z.object({
   title: z.string().min(1),
@@ -14,7 +14,4 @@ const ticketSchema = z.object({
 
 const ticketsSchema = z.array(ticketSchema).min(1);
 
-module.exports = {
-  ticketSchema,
-  ticketsSchema,
-};
+export { ticketSchema, ticketsSchema };

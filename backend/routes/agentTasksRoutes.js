@@ -1,14 +1,15 @@
-const express = require("express");
-const router = express.Router();
-const verifyToken = require("../middleware/verifyToken");
-const {
+import express from "express";
+import verifyToken from "../middleware/verifyToken.js";
+import {
   createAgentTask,
   getAgentTaskTrace,
   applyDraftTickets,
   confirmAgentTask,
   chatAgentTask,
   undoAgentTask,
-} = require("../controllers/agentTasksController");
+} from "../controllers/agentTasksController.js";
+
+const router = express.Router();
 
 router.post("/", verifyToken, createAgentTask);
 router.get("/:id/trace", verifyToken, getAgentTaskTrace);
@@ -17,4 +18,4 @@ router.post("/:id/confirm", verifyToken, confirmAgentTask);
 router.post("/:id/chat", verifyToken, chatAgentTask);
 router.post("/:id/undo", verifyToken, undoAgentTask);
 
-module.exports = router;
+export default router;

@@ -3,6 +3,7 @@ import { AppProvider } from "@toolpad/core/AppProvider";
 import { DashboardLayout, ThemeSwitcher } from "@toolpad/core/DashboardLayout";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import DashboardIcon from "@mui/icons-material/Dashboard";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import {
   Account,
   AccountPreview,
@@ -22,6 +23,11 @@ const NAVIGATION = [
   {
     kind: "header",
     title: "Workspace",
+  },
+  {
+    segment: "home",
+    title: "New from PRD",
+    icon: <AutoAwesomeIcon />,
   },
   {
     segment: "projects",
@@ -172,7 +178,7 @@ function Dashboard() {
       branding={{
         logo: <img src={forgeLogo} alt="FORGE logo" style={{ height: 50 }} />,
         title: "",
-        homeUrl: "/projects",
+        homeUrl: "/home",
       }}
       router={router}
       theme={theme}

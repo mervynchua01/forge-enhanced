@@ -1,4 +1,4 @@
-const { supabaseAdmin, supabaseAuth } = require("../lib/supabase");
+import { supabaseAdmin, supabaseAuth } from "../lib/supabase.js";
 
 const mapUser = (row) => ({
   _id: row.id,
@@ -122,4 +122,4 @@ const signout = async (req, res) => {
   return res.status(200).json({ message: "Signed out successfully." });
 };
 
-module.exports = { signup, signin, signout };
+export { signup, signin, signout };

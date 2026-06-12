@@ -9,6 +9,7 @@ import ProjectSpace from "./components/ProjectSpace";
 import Dashboard from "./components/Dashboard";
 import { theme } from "./styles/theme";
 import TaskPage from "./pages/TaskPage";
+import PrdImportHero from "./pages/PrdImportHero";
 
 function RequireAuth({ children }) {
   const { session, loading } = useAuth();
@@ -45,6 +46,7 @@ function App() {
               </RequireAuth>
             }
           >
+            <Route path="/home" element={<PrdImportHero />} />
             <Route path="/projects" element={<ProjectSpace />} />
             <Route path="/tasks/:projectId" element={<TaskPage />} />
           </Route>

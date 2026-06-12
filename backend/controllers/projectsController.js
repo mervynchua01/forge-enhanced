@@ -1,4 +1,4 @@
-const { supabaseAdmin } = require("../lib/supabase");
+import { supabaseAdmin } from "../lib/supabase.js";
 
 const mapUser = (row) => ({
   _id: row.id,
@@ -339,7 +339,7 @@ const getProjectMembers = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
   createProject,
   getAllProjects,
   getProjectById,

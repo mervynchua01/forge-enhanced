@@ -1,10 +1,11 @@
-const express = require("express");
+import express from "express";
+import { signup, signin, signout } from "../controllers/auth-controllers.js";
+import verifyToken from "../middleware/verifyToken.js";
+
 const router = express.Router();
-const { signup, signin, signout } = require("../controllers/auth-controllers");
-const verifyToken = require("../middleware/verifyToken");
 
 router.post("/signup", signup);
 router.post("/signin", signin);
 router.post("/signout", verifyToken, signout);
 
-module.exports = router;
+export default router;
