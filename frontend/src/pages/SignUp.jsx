@@ -45,7 +45,7 @@ export default function SignUp() {
         firstName: formData.firstName,
         lastName: formData.lastName,
       });
-      navigate("/projects");
+      navigate("/home");
     } catch (err) {
       setError(err?.message || "Something went wrong.");
     } finally {

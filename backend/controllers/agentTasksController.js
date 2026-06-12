@@ -3,9 +3,8 @@ import { ticketsSchema } from "../validation/ticketSchemas.js";
 import { generateDraftTickets, refineTickets } from "../lib/llm.js";
 import { ensureIds } from "../lib/refinementTools.js";
 
-// Input limits and retention defaults for PRD intake.
+// Input limit for PRD intake.
 const MAX_PRD_CHARS = 50000;
-const DEFAULT_RETENTION_DAYS = 90;
 
 // Check whether a user is allowed to access a project.
 const isProjectMember = (project, userId) => {
@@ -23,7 +22,6 @@ const mapAgentTask = (row) => ({
   draftTickets: row.draft_tickets,
   chatHistory: row.chat_history,
   state: row.state,
-  retentionUntil: row.retention_until,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -101,11 +99,6 @@ export const createAgentTask = async (req, res) => {
       return res.status(403).json({ message: "Not authorized for this project." });
     }
 
-    // Set a simple retention timestamp to support future cleanup.
-    const retentionUntil = new Date(
-      Date.now() + DEFAULT_RETENTION_DAYS * 24 * 60 * 60 * 1000,
-    ).toISOString();
-
     // Insert the new agent task in its initial state.
     const { data: agentTask, error } = await supabaseAdmin
       .from("agent_tasks")
@@ -114,7 +107,6 @@ export const createAgentTask = async (req, res) => {
         created_by: req.user.userId,
         prd_text: prdText,
         state: "generating",
-        retention_until: retentionUntil,
       })
       .select("*")
       .single();

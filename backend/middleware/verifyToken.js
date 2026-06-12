@@ -1,16 +1,6 @@
 import { supabaseAdmin } from "../lib/supabase.js";
 
-// DEV BYPASS — only active when DEV_BYPASS=true is set in the environment.
-// Defaults to OFF so production (where the var is unset) always verifies tokens.
-const DEV_BYPASS = process.env.DEV_BYPASS === "true";
-const DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
-
 const verifyToken = async (req, res, next) => {
-  if (DEV_BYPASS) {
-    req.user = { userId: DEV_USER_ID, email: "dev@forge.local" };
-    return next();
-  }
-
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {

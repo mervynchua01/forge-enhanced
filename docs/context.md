@@ -120,7 +120,6 @@ Forge adds AI-powered ticket generation and refinement for PRDs. A user submits 
 - Trace endpoint returns full event history, tool calls, and chat turns.
 - JWT auth on all endpoints; Supabase RLS for data access.
 - LLM API keys in Supabase Vault, never exposed to frontend.
-- PRD retention policy enforced (purge after 90 days by default).
 
 ## Risks and Mitigations
 - LLM outage or pricing change: provider abstraction + fallback.

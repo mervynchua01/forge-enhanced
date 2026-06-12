@@ -50,7 +50,6 @@ create table if not exists agent_tasks (
   draft_tickets jsonb not null default '[]'::jsonb,
   chat_history jsonb not null default '[]'::jsonb,
   state text not null default 'generating',
-  retention_until timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
