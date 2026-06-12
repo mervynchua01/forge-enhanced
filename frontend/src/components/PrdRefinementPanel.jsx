@@ -9,12 +9,10 @@ import TextField from "@mui/material/TextField";
 import Alert from "@mui/material/Alert";
 import Divider from "@mui/material/Divider";
 import CircularProgress from "@mui/material/CircularProgress";
-import UndoIcon from "@mui/icons-material/Undo";
 import SendIcon from "@mui/icons-material/Send";
 
 import {
   chatAgentTask,
-  undoAgentTask,
   applyDraftTickets,
   confirmAgentTask,
 } from "../services/agentTasksService";
@@ -30,7 +28,6 @@ export default function PrdRefinementPanel({
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [isChatting, setIsChatting] = useState(false);
-  const [isUndoing, setIsUndoing] = useState(false);
   const [isConfirmingDraft, setIsConfirmingDraft] = useState(false);
   const [error, setError] = useState("");
   const chatEndRef = useRef(null);
@@ -61,24 +58,6 @@ export default function PrdRefinementPanel({
       setChatMessages((prev) => prev.slice(0, -1));
     } finally {
       setIsChatting(false);
-    }
-  };
-
-  const handleUndo = async () => {
-    if (!agentTaskId || isUndoing || chatMessages.length === 0) return;
-
-    setIsUndoing(true);
-    setError("");
-
-    try {
-      const response = await undoAgentTask(agentTaskId);
-      setDraftTickets(response.data.draftTickets);
-      // Remove the last user + assistant message pair from the local chat display.
-      setChatMessages((prev) => prev.slice(0, -2));
-    } catch (err) {
-      setError(err?.response?.data?.message || "Undo failed.");
-    } finally {
-      setIsUndoing(false);
     }
   };
 
@@ -117,25 +96,10 @@ export default function PrdRefinementPanel({
             minWidth: 0,
           }}
         >
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              mb: 1,
-            }}
-          >
+          <Box sx={{ mb: 1 }}>
             <Typography variant="subtitle1" fontWeight={700}>
               Draft preview ({draftTickets.length})
             </Typography>
-            <IconButton
-              size="small"
-              onClick={handleUndo}
-              disabled={isUndoing || chatMessages.length === 0}
-              title="Undo last turn"
-            >
-              {isUndoing ? <CircularProgress size={16} /> : <UndoIcon fontSize="small" />}
-            </IconButton>
           </Box>
 
           {error ? (

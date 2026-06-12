@@ -406,7 +406,7 @@ export const chatAgentTask = async (req, res) => {
       message.trim(),
     );
 
-    const newTurn = { snapshot_before: draftWithIds, messages: turnMessages };
+    const newTurn = { messages: turnMessages };
 
     const { error: updateError } = await supabaseAdmin
       .from("agent_tasks")
@@ -423,66 +423,6 @@ export const chatAgentTask = async (req, res) => {
     }
 
     return res.json({ draftTickets: updatedDraft, message: assistantText });
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
-  }
-};
-
-// Revert the most recent refinement turn.
-export const undoAgentTask = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const { data: agentTask, error } = await supabaseAdmin
-      .from("agent_tasks")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (error || !agentTask) {
-      return res.status(404).json({ message: "Agent task not found." });
-    }
-
-    const { data: project, error: projectError } = await supabaseAdmin
-      .from("projects")
-      .select("id, project_lead, members")
-      .eq("id", agentTask.project_id)
-      .single();
-
-    if (projectError || !project) {
-      return res.status(404).json({ message: "Project not found." });
-    }
-
-    if (!isProjectMember(project, req.user.userId)) {
-      return res.status(403).json({ message: "Not authorized." });
-    }
-
-    const turns = Array.isArray(agentTask.chat_history) ? agentTask.chat_history : [];
-
-    if (turns.length === 0) {
-      return res.status(400).json({ message: "Nothing to undo." });
-    }
-
-    const lastTurn = turns[turns.length - 1];
-    const restoredDraft = lastTurn.snapshot_before;
-    const newTurns = turns.slice(0, -1);
-    const newState = newTurns.length === 0 ? "draft_ready" : "refining";
-
-    const { error: updateError } = await supabaseAdmin
-      .from("agent_tasks")
-      .update({
-        draft_tickets: restoredDraft,
-        chat_history: newTurns,
-        state: newState,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
-
-    if (updateError) {
-      return res.status(500).json({ message: updateError.message });
-    }
-
-    return res.json({ draftTickets: restoredDraft });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }

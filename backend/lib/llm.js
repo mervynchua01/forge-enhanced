@@ -89,7 +89,7 @@ Each ticket has a "draft_id" — use it as the identifier in every tool call.`;
 
 /**
  * Run one conversational refinement turn with full agentic tool-use loop.
- * `turns` is the stored chat_history array (each element has { snapshot_before, messages }).
+ * `turns` is the stored chat_history array (each element has { messages }).
  * Returns { updatedDraft, turnMessages, assistantText }.
  */
 const refineTickets = async (turns, draftTickets, userMessage) => {
