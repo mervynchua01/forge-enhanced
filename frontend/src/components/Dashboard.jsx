@@ -155,14 +155,18 @@ function Dashboard() {
     };
   }, [location, navigate]);
 
-  const userSession = user
-    ? {
-        user: {
-          name: `${user.firstName} ${user.lastName}`,
-          email: user.email,
-        },
-      }
-    : null;
+  const userSession = useMemo(
+    () =>
+      user
+        ? {
+            user: {
+              name: `${user.firstName} ${user.lastName}`,
+              email: user.email,
+            },
+          }
+        : null,
+    [user],
+  );
 
   const [session, setSession] = useState(userSession);
 

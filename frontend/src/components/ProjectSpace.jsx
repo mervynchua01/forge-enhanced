@@ -128,6 +128,31 @@ const ProjectSpace = () => {
           const isProjectLead = user && project?.projectLead?._id === user._id;
           return (
             <Card key={project._id} sx={{ position: "relative" }}>
+              {isProjectLead && (
+                <IconButton
+                  size="small"
+                  sx={{
+                    position: "absolute",
+                    top: 8,
+                    right: 8,
+                    zIndex: 2,
+                    color: "primary.main",
+                    bgcolor: "background.paper",
+                    boxShadow: 1,
+                    "&:hover": {
+                      bgcolor: "primary.main",
+                      color: "white",
+                    },
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedProjectId(project._id);
+                    setOpenEditForm(true);
+                  }}
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              )}
               <CardActionArea
                 onClick={() => navigate(`/tasks/${project._id}`)}
                 sx={{
@@ -153,31 +178,6 @@ const ProjectSpace = () => {
                         {project.projectTitle}
                       </Typography>
                     </Box>
-                    {isProjectLead && (
-                      <IconButton
-                        size="small"
-                        sx={{
-                          position: "absolute",
-                          top: 8,
-                          right: 8,
-                          zIndex: 2,
-                          color: "primary.main",
-                          bgcolor: "background.paper",
-                          boxShadow: 1,
-                          "&:hover": {
-                            bgcolor: "primary.main",
-                            color: "white",
-                          },
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedProjectId(project._id);
-                          setOpenEditForm(true);
-                        }}
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                    )}
                   </Stack>
                   <Typography
                     variant="body2"
