@@ -17,7 +17,7 @@ import { useAuth } from "../context/AuthContext";
 import UserAvatar from "./UserAvatar";
 import forgeLogo from "../assets/FORGE.png";
 import { theme } from "../styles/theme";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 
 const NAVIGATION = [
   {
@@ -145,7 +145,7 @@ function SidebarFooterAccount({ mini }) {
 function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, loading, signOut } = useAuth();
+  const { user, signOut } = useAuth();
 
   const router = useMemo(() => {
     return {
@@ -155,7 +155,7 @@ function Dashboard() {
     };
   }, [location, navigate]);
 
-  const userSession = useMemo(
+  const session = useMemo(
     () =>
       user
         ? {
@@ -167,12 +167,6 @@ function Dashboard() {
         : null,
     [user],
   );
-
-  const [session, setSession] = useState(userSession);
-
-  useEffect(() => {
-    setSession(userSession);
-  }, [userSession]);
 
   // if (loading) { return null; } // temporarily disabled
 
@@ -190,7 +184,6 @@ function Dashboard() {
       authentication={{
         signIn: () => navigate("/signin"),
         signOut: async () => {
-          setSession(null);
           await signOut();
           navigate("/signout");
         },
