@@ -56,15 +56,20 @@ export default function SignIn() {
     >
       <Paper
         elevation={0}
-        sx={{
+        sx={(theme) => ({
           width: "100%",
           maxWidth: 448,
           p: 4,
           border: "1px solid",
           borderColor: "divider",
-          borderRadius: 3,
+          borderRadius: 4,
           textAlign: "center",
-        }}
+          boxShadow: `0 24px 64px ${theme.vars.palette.forge.glowSoft}`,
+          "@supports (backdrop-filter: blur(0px))": {
+            backgroundColor: `color-mix(in srgb, ${theme.vars.palette.background.paper} 82%, transparent)`,
+            backdropFilter: "blur(10px)",
+          },
+        })}
       >
         <Box mb={3}>
           <img src={forgeLogo} alt="Forge Logo" style={{ height: 40 }} />

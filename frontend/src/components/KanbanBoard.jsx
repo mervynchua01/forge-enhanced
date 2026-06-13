@@ -7,9 +7,14 @@ import {
 } from "@dnd-kit/core";
 
 import { useState, useEffect } from "react";
-import { alpha, useTheme } from "@mui/material/styles";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import Chip from "@mui/material/Chip";
 
 import TaskCard, { TaskCardPreview } from "./TaskCard";
+import EmptyState from "./ui/EmptyState";
+import { StatusDot } from "./ui/MetaChips";
 import { supabase } from "../lib/supabaseClient";
 import { getApiBaseUrl } from "../lib/apiBaseUrl";
 
@@ -27,58 +32,51 @@ function boardCollisionDetection(args) {
 const columns = ["To Do", "In Progress", "In Review", "Done"];
 
 function DroppableColumn({ columnId, title, columnTasks, onTaskClick }) {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
-
   const { setNodeRef, isOver } = useDroppable({
     id: columnId,
   });
 
-  const columnBg = isDark
-    ? isOver
-      ? alpha(theme.palette.primary.main, 0.14)
-      : alpha(theme.palette.background.paper, 0.55)
-    : isOver
-      ? "#e8eaed"
-      : "#f4f5f7";
-
   return (
-    <div
+    <Box
       ref={setNodeRef}
-      style={{
-        width: "300px",
-
-        background: columnBg,
-
-        padding: "15px",
-
-        borderRadius: "10px",
-
-        minHeight: "500px",
-
+      sx={(theme) => ({
+        width: 300,
         flexShrink: 0,
-
-        ...(isDark
-          ? {
-              border: `1px solid ${alpha(theme.palette.divider, 0.35)}`,
-            }
-          : {}),
-      }}
+        minHeight: 500,
+        p: 1.75,
+        borderRadius: 3,
+        bgcolor: isOver ? "forge.columnBgOver" : "forge.columnBg",
+        border: "1px solid",
+        borderColor: isOver ? "primary.main" : "divider",
+        boxShadow: isOver
+          ? `0 0 0 3px ${theme.vars.palette.forge.glowSoft}`
+          : "none",
+        transition:
+          "background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease",
+      })}
     >
-      <h3
-        style={{
-          marginTop: 0,
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5, px: 0.5 }}>
+        <StatusDot value={columnId} />
+        <Typography variant="subtitle2" fontWeight={700}>
+          {title}
+        </Typography>
+        <Chip
+          label={(columnTasks || []).length}
+          size="small"
+          sx={{ height: 20, fontSize: "0.7rem", bgcolor: "background.paper" }}
+        />
+      </Stack>
 
-          color: theme.palette.text.primary,
-        }}
-      >
-        {title}
-      </h3>
-
-      {(columnTasks || []).map((task) => (
-        <TaskCard key={task._id} task={task} onClick={onTaskClick} />
-      ))}
-    </div>
+      {(columnTasks || []).length === 0 ? (
+        <EmptyState caption="Drop a task here" sx={{ py: 6 }} />
+      ) : (
+        <Stack spacing={1.5}>
+          {(columnTasks || []).map((task) => (
+            <TaskCard key={task._id} task={task} onClick={onTaskClick} />
+          ))}
+        </Stack>
+      )}
+    </Box>
   );
 }
 
@@ -169,13 +167,7 @@ export default function KanbanBoard({ tasks, setTasks, onTaskClick }) {
       onDragCancel={() => setActiveId(null)}
       onDragEnd={handleDragEnd}
     >
-      <div
-        style={{
-          display: "flex",
-
-          gap: "20px",
-        }}
-      >
+      <Box sx={{ display: "flex", gap: 2.5 }}>
         {columns.map((col) => (
           <DroppableColumn
             key={col}
@@ -185,7 +177,7 @@ export default function KanbanBoard({ tasks, setTasks, onTaskClick }) {
             onTaskClick={onTaskClick}
           />
         ))}
-      </div>
+      </Box>
 
       <DragOverlay dropAnimation={null}>
         {activeTask ? <TaskCardPreview task={activeTask} /> : null}

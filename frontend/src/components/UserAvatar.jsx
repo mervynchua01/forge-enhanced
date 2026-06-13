@@ -1,6 +1,4 @@
 import Avatar from "@mui/material/Avatar";
-import Stack from "@mui/material/Stack";
-import { Children } from "react";
 
 function stringToColor(name) {
   let hash = 0;
@@ -17,30 +15,26 @@ function stringToColor(name) {
   return color;
 }
 
-function stringAvatar(name = "") {
-  const parts = name.split(" ");
-
-  const initials =
-  parts.length > 1
-    ? `${parts[0][0]}${parts[1][0]}`
-    : `${parts[0][0]}`;
-
-  return {
-    sx: {
-      bgcolor: stringToColor(name),
-      width: 35,
-      height: 35,
-      fontSize: "14px",
-    },
-
-    children: initials.toUpperCase(),
-  };
+function initialsFor(name = "") {
+  const parts = name.split(" ").filter(Boolean);
+  if (parts.length === 0) return "?";
+  return parts.length > 1
+    ? `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+    : parts[0][0].toUpperCase();
 }
 
-export default function UserAvatar({ name, }) {
+export default function UserAvatar({ name = "", size = 35 }) {
   return (
-    <Stack direction="row" spacing={2}>
-      <Avatar {...stringAvatar(name)} />
-    </Stack>
+    <Avatar
+      sx={{
+        bgcolor: stringToColor(name),
+        width: size,
+        height: size,
+        fontSize: size * 0.4,
+        fontWeight: 600,
+      }}
+    >
+      {initialsFor(name)}
+    </Avatar>
   );
 }

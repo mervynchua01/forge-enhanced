@@ -1,16 +1,13 @@
 import { useMemo, useState } from "react";
 import {
   Box,
-  Paper,
   Typography,
   TextField,
-  Select,
   Button,
   Alert,
-  Link,
-  Grid,
   Autocomplete,
   MenuItem,
+  Stack,
 } from "@mui/material";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -21,10 +18,8 @@ import {
   queryUserByName,
 } from "../services/projectSpaceService";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
 
 const CreateProjectForm = ({ onClose }) => {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [errorMessage, setErrorMessage] = useState("");
   const [formData, setFormData] = useState({
@@ -107,30 +102,12 @@ const CreateProjectForm = ({ onClose }) => {
     }
   };
 
+  // Rendered inside a <Dialog>, so this is plain content — no page chrome.
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        bgcolor: "background.default",
-      }}
-    >
-      <Paper
-        elevation={0}
-        sx={{
-          width: "100%",
-          maxWidth: 448,
-          p: 4,
-          border: "1px solid",
-          borderColor: "grey.200",
-          borderRadius: 3,
-        }}
-      >
-        <Typography variant="h5" fontWeight={600} color="grey.900" mb={0.5}>
-          Create a New Project
-        </Typography>
+    <Box sx={{ pt: 0.5 }}>
+      <Typography variant="h5" mb={2}>
+        Create a New Project
+      </Typography>
 
         <Box
           component="form"
@@ -259,22 +236,15 @@ const CreateProjectForm = ({ onClose }) => {
             <MenuItem value={"In Review"}>In Review</MenuItem>
             <MenuItem value={"Completed"}>Completed</MenuItem>
           </TextField>
-          <Box>
-            <Button variant="outlined" fullWidth onClick={onClose}>
+          <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ mt: 1 }}>
+            <Button variant="outlined" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              fullWidth
-              sx={{ mt: 0.5, py: 1 }}
-            >
+            <Button type="submit" variant="contained" color="primary">
               Create
             </Button>
-          </Box>
+          </Stack>
         </Box>
-      </Paper>
     </Box>
   );
 };

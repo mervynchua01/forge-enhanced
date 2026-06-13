@@ -1,21 +1,13 @@
 import {
-  Box,
   Paper,
   Typography,
   TextField,
-  Select,
   Button,
-  Alert,
-  Link,
-  Grid,
   Autocomplete,
   MenuItem,
-  IconButton,
   Stack,
-  Icon,
 } from "@mui/material";
 import { useState, useEffect, useMemo } from "react";
-import { useAuth } from "../context/AuthContext";
 import {
   queryUserByName,
   getProjectDetails,
@@ -90,6 +82,7 @@ function EditProjectForm({ projectId, onClose }) {
     >
       <LocalizationProvider dateAdapter={AdapterDayjs}>
         <Stack spacing={3}>
+          <Typography variant="h5">Edit Project</Typography>
           <TextField
             label="Project Title"
             fullWidth
@@ -145,13 +138,6 @@ function EditProjectForm({ projectId, onClose }) {
             onChange={(event, newValue) => {
               setEditForm({ ...editForm, members: newValue });
             }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Project Members"
-                placeholder="Add members..."
-              />
-            )}
             isOptionEqualToValue={(option, value) => option._id === value._id}
             renderInput={(params) => (
               <TextField

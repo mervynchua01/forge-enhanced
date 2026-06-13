@@ -4,36 +4,30 @@ import {
   CardContent,
   Typography,
   CardActionArea,
-  CardActions,
-  Button,
   IconButton,
   Dialog,
   DialogContent,
-  DialogTitle,
   Stack,
+  LinearProgress,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
 import { useEffect, useState } from "react";
 import * as workspaceService from "../services/projectSpaceService";
 import UserAvatar from "./UserAvatar";
 import AvatarGroup from "@mui/material/AvatarGroup";
 import { useAuth } from "../context/AuthContext";
 import CreateProjectForm from "./CreateProjectForm";
+import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import EditProjectForm from "./EditProjectForm";
-import TaskPage from "../pages/TaskPage";
+import PageHeader from "./ui/PageHeader";
 import { useNavigate } from "react-router-dom";
 
 const ProjectSpace = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
   const [projects, setProjects] = useState([]);
-  const [selectedProject, setSelectedProject] = useState(null);
   const [openProjectForm, setOpenProjectForm] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
-  const [openTaskPage, setOpenTaskPage] = useState(false);
   const [openEditForm, setOpenEditForm] = useState(false);
 
   const fetchWorkspace = async () => {
@@ -71,6 +65,11 @@ const ProjectSpace = () => {
 
   return (
     <>
+      <PageHeader
+        title="Projects"
+        subtitle="Everything your team is forging right now."
+      />
+
       <Box
         sx={{
           width: "100%",
@@ -80,16 +79,18 @@ const ProjectSpace = () => {
           gap: 2,
         }}
       >
-        <Card>
+        <Card sx={{ border: "none", boxShadow: "none", bgcolor: "transparent" }}>
           <CardActionArea
             sx={{
               height: "100%",
+              borderRadius: "inherit",
               border: "2px dashed",
               borderColor: "divider",
-              transition: "all 0.2s ease-in-out",
+              color: "primary.main",
+              transition: "border-color 0.2s ease, background-color 0.2s ease",
               "&:hover": {
                 borderColor: "primary.main",
-                bgcolor: "rgba(107, 33, 168, 0.02)",
+                bgcolor: "forge.glowSoft",
               },
             }}
             onClick={() => setOpenProjectForm(true)}
@@ -97,17 +98,14 @@ const ProjectSpace = () => {
             <CardContent
               sx={{
                 textAlign: "center",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 0.75,
               }}
             >
-              <Typography
-                variant="h6"
-                sx={{
-                  opacity: 0.9,
-                  color: isDark ? "text.primary" : "primary.main",
-                }}
-              >
-                + New Project
-              </Typography>
+              <AddIcon fontSize="small" />
+              <Typography variant="h6">New Project</Typography>
             </CardContent>
           </CardActionArea>
           <Dialog
@@ -126,17 +124,12 @@ const ProjectSpace = () => {
             </DialogContent>
           </Dialog>
         </Card>
-        {projects?.map((project, index) => {
+        {projects?.map((project) => {
           const isProjectLead = user && project?.projectLead?._id === user._id;
           return (
             <Card key={project._id} sx={{ position: "relative" }}>
               <CardActionArea
-                onClick={() => {
-                  // setSelectedProject(index);
-                  // setSelectedProjectId(project._id);
-                  // setOpenTaskPage(true);
-                  navigate(`/tasks/${project._id}`);
-                }}
+                onClick={() => navigate(`/tasks/${project._id}`)}
                 sx={{
                   height: "100%",
                 }}
@@ -193,10 +186,23 @@ const ProjectSpace = () => {
                   >
                     {project.description}
                   </Typography>
-                  <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                    {project.progress.completed} / {project.progress.total}{" "}
-                    tasks completed
-                  </Typography>
+                  <Box sx={{ mt: 1 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                      {project.progress.completed} / {project.progress.total}{" "}
+                      tasks completed
+                    </Typography>
+                    <LinearProgress
+                      variant="determinate"
+                      value={
+                        project.progress.total > 0
+                          ? (project.progress.completed /
+                              project.progress.total) *
+                            100
+                          : 0
+                      }
+                      sx={{ mt: 0.5, height: 6, borderRadius: 3 }}
+                    />
+                  </Box>
 
                   <AvatarGroup
                     max={4}

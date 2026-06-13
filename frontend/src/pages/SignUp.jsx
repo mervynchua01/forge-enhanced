@@ -58,6 +58,7 @@ export default function SignUp() {
       sx={{
         minHeight: "100vh",
         display: "flex",
+        alignItems: "center",
         justifyContent: "center",
         backgroundImage: `url(${loginBg})`,
         backgroundSize: "cover",
@@ -67,14 +68,19 @@ export default function SignUp() {
     >
       <Paper
         elevation={0}
-        sx={{
+        sx={(theme) => ({
           width: "100%",
           maxWidth: 448,
           p: 4,
           border: "1px solid",
           borderColor: "divider",
-          borderRadius: 3,
-        }}
+          borderRadius: 4,
+          boxShadow: `0 24px 64px ${theme.vars.palette.forge.glowSoft}`,
+          "@supports (backdrop-filter: blur(0px))": {
+            backgroundColor: `color-mix(in srgb, ${theme.vars.palette.background.paper} 82%, transparent)`,
+            backdropFilter: "blur(10px)",
+          },
+        })}
       >
         <Box mb={2} textAlign="center">
           <img src={forgeLogo} alt="Forge Logo" style={{ height: 36 }} />
@@ -183,7 +189,7 @@ export default function SignUp() {
           <Link
             component={RouterLink}
             to="/signin"
-            color="divider"
+            color="primary"
             fontWeight={500}
             underline="hover"
           >

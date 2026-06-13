@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import Stack from "@mui/material/Stack";
@@ -9,6 +8,8 @@ import dayjs from "dayjs";
 
 import KanbanBoard from "../components/KanbanBoard";
 import TaskModal from "../components/TaskModal";
+import PageHeader from "../components/ui/PageHeader";
+import { StatusChip } from "../components/ui/MetaChips";
 import api from "../services/api";
 import { getProjectDetails } from "../services/projectSpaceService";
 
@@ -106,110 +107,48 @@ export default function TaskPage() {
     >
       {/* Keep header aligned with the board's full scroll width */}
       <Box sx={{ overflowX: "auto", pb: 0.5, mb: 2 }}>
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 2,
-            width: "max-content",
-            minWidth: "100%",
-            // Kanban columns are fixed-width; this makes the button sit above "Done"
-            // even when the board is wider than the viewport.
-          }}
+        {/* Kanban columns are fixed-width; max-content keeps the actions above
+            "Done" even when the board is wider than the viewport. */}
+        <PageHeader
+          title={`${projectTitle} Tasks`}
+          subtitle={project?.description || ""}
+          sx={{ width: "max-content", minWidth: "100%", mb: 0 }}
+          actions={
+            <>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleCreateTask}
+              >
+                + Create Task
+              </Button>
+
+              <Button
+                variant="outlined"
+                color="primary"
+                onClick={() => navigate(`/home?projectId=${projectId}`)}
+              >
+                Import PRD
+              </Button>
+            </>
+          }
         >
-          <Typography component="h1" variant="h5" fontWeight={700}>
-            {projectTitle} Tasks
-          </Typography>
-
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleCreateTask}
-            sx={{ ml: "auto", flexShrink: 0 }}
+          <Stack
+            direction="row"
+            spacing={1}
+            flexWrap="wrap"
+            useFlexGap
+            sx={{ mt: 1.25 }}
           >
-            + Create Task
-          </Button>
-
-          <Button
-            variant="outlined"
-            color="primary"
-            onClick={() => navigate(`/home?projectId=${projectId}`)}
-            sx={{ flexShrink: 0 }}
-          >
-            Import PRD
-          </Button>
-        </Box>
-
-        <Box sx={{ mt: 1.25, width: "max-content", minWidth: "100%" }}>
-          <Stack spacing={1}>
-            <Typography variant="body2" color="text.secondary">
-              {project?.description || ""}
-            </Typography>
-
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-              <Chip
-                clickable
-                variant="outlined"
-                label={leadLabel}
-                sx={(theme) => ({
-                  fontWeight: 600,
-                  color:
-                    theme.palette.mode === "dark"
-                      ? theme.palette.primary.main
-                      : undefined,
-                  borderColor:
-                    theme.palette.mode === "dark"
-                      ? theme.palette.primary.main
-                      : undefined,
-                  backgroundColor:
-                    theme.palette.mode === "dark"
-                      ? "rgba(168, 85, 247, 0.10)"
-                      : undefined,
-                })}
-              />
-              <Chip
-                clickable
-                variant="outlined"
-                label={targetDateLabel}
-                sx={(theme) => ({
-                  fontWeight: 600,
-                  color:
-                    theme.palette.mode === "dark"
-                      ? theme.palette.primary.main
-                      : undefined,
-                  borderColor:
-                    theme.palette.mode === "dark"
-                      ? theme.palette.primary.main
-                      : undefined,
-                  backgroundColor:
-                    theme.palette.mode === "dark"
-                      ? "rgba(168, 85, 247, 0.10)"
-                      : undefined,
-                })}
-              />
-              <Chip
-                clickable
-                variant="outlined"
-                label={statusLabel}
-                sx={(theme) => ({
-                  fontWeight: 600,
-                  color:
-                    theme.palette.mode === "dark"
-                      ? theme.palette.primary.main
-                      : undefined,
-                  borderColor:
-                    theme.palette.mode === "dark"
-                      ? theme.palette.primary.main
-                      : undefined,
-                  backgroundColor:
-                    theme.palette.mode === "dark"
-                      ? "rgba(168, 85, 247, 0.10)"
-                      : undefined,
-                })}
-              />
-            </Stack>
+            <Chip variant="outlined" size="small" label={`Lead: ${leadLabel}`} />
+            <Chip
+              variant="outlined"
+              size="small"
+              label={`Due: ${targetDateLabel}`}
+            />
+            <StatusChip value={statusLabel} />
           </Stack>
-        </Box>
+        </PageHeader>
 
         <Box sx={{ mt: 2, width: "max-content", minWidth: "100%" }}>
           <KanbanBoard

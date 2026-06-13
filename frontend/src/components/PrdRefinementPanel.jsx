@@ -3,13 +3,14 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
-import Chip from "@mui/material/Chip";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Alert from "@mui/material/Alert";
 import Divider from "@mui/material/Divider";
-import CircularProgress from "@mui/material/CircularProgress";
 import SendIcon from "@mui/icons-material/Send";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+
+import { TypeChip, PriorityChip } from "./ui/MetaChips";
 
 import {
   chatAgentTask,
@@ -96,11 +97,12 @@ export default function PrdRefinementPanel({
             minWidth: 0,
           }}
         >
-          <Box sx={{ mb: 1 }}>
+          <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
+            <AutoAwesomeIcon fontSize="small" sx={{ color: "primary.main" }} />
             <Typography variant="subtitle1" fontWeight={700}>
               Draft preview ({draftTickets.length})
             </Typography>
-          </Box>
+          </Stack>
 
           {error ? (
             <Alert severity="error" sx={{ mb: 1 }}>
@@ -127,9 +129,11 @@ export default function PrdRefinementPanel({
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                     {ticket.description}
                   </Typography>
-                  <Stack direction="row" spacing={0.5} sx={{ mt: 0.75 }}>
-                    <Chip label={ticket.type} size="small" variant="outlined" />
-                    <Chip label={ticket.priority} size="small" variant="outlined" />
+                  <Stack direction="row" spacing={0.75} sx={{ mt: 0.75 }}>
+                    {ticket.type ? <TypeChip value={ticket.type} /> : null}
+                    {ticket.priority ? (
+                      <PriorityChip value={ticket.priority} />
+                    ) : null}
                   </Stack>
                 </Box>
               ))}
@@ -188,8 +192,25 @@ export default function PrdRefinementPanel({
               </Box>
             ))}
             {isChatting ? (
-              <Box sx={{ alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 1 }}>
-                <CircularProgress size={14} />
+              <Box
+                sx={{
+                  alignSelf: "flex-start",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  "@keyframes forgePulse": {
+                    "0%, 100%": { opacity: 0.4 },
+                    "50%": { opacity: 1 },
+                  },
+                }}
+              >
+                <AutoAwesomeIcon
+                  sx={{
+                    fontSize: 16,
+                    color: "primary.main",
+                    animation: "forgePulse 1.4s ease-in-out infinite",
+                  }}
+                />
                 <Typography variant="caption" color="text.secondary">
                   Thinking...
                 </Typography>

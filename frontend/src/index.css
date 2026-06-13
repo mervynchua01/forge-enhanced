@@ -1,1 +1,21 @@
-@import "tailwindcss";
+/* Global base styles. Component styling lives in the MUI theme
+   (src/styles/theme.js) — keep this file to resets only. */
+
+html {
+  scrollbar-gutter: stable;
+}
+
+/* Slim, theme-neutral scrollbars (WebKit). */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 8px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
+}

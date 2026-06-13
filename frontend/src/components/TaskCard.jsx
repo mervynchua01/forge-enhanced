@@ -1,163 +1,107 @@
 import { useDraggable } from "@dnd-kit/core";
-import { alpha, useTheme } from "@mui/material/styles";
+import Box from "@mui/material/Box";
+import Card from "@mui/material/Card";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 
 import UserAvatar from "./UserAvatar";
+import { TypeChip, PriorityChip } from "./ui/MetaChips";
 
-function useTaskCardShellStyle({ marginBottom = "12px" } = {}) {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
-
-  return {
-    background: isDark
-      ? theme.palette.background.paper
-      : "#ffffff",
-
-    color: theme.palette.text.primary,
-
-    padding: "15px",
-
-    borderRadius: "10px",
-
-    boxShadow: isDark
-      ? `0 2px 10px ${alpha("#000000", 0.45)}`
-      : "0 2px 6px rgba(0,0,0,0.1)",
-
-    ...(isDark
-      ? {
-          border: `1px solid ${alpha(theme.palette.divider, 0.35)}`,
-        }
-      : {}),
-
-    marginBottom,
-  };
-}
+const cardSx = (theme) => ({
+  p: 1.75,
+  borderRadius: 2.5,
+  "&:hover": {
+    borderColor: "primary.main",
+    boxShadow: `0 4px 14px ${theme.vars.palette.forge.glowSoft}`,
+  },
+});
 
 function TaskCardBody({ task, onClick }) {
   return (
-    <div onClick={() => onClick?.(task)}>
-      <div
-        style={{
+    <Box onClick={() => onClick?.(task)} sx={{ cursor: "pointer" }}>
+      <Box
+        sx={{
           display: "flex",
-
           justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 1,
         }}
       >
-        <strong>{task.title}</strong>
+        <Typography variant="body2" fontWeight={600} sx={{ wordBreak: "break-word" }}>
+          {task.title}
+        </Typography>
 
-        <div
-          style={{
-            display: "flex",
-            gap: "5px",
-          }}
-        >
+        <Stack direction="row" spacing={-0.75} flexShrink={0}>
           {task.assignees?.map((user) => (
-            <UserAvatar
-              key={user._id}
-              name={user.username}
-            />
+            <UserAvatar key={user._id} name={user.username} size={24} />
           ))}
-        </div>
-      </div>
+        </Stack>
+      </Box>
 
-      <div
-        style={{
-          marginTop: "10px",
+      <Stack direction="row" spacing={0.75} sx={{ mt: 1.25 }}>
+        {task.type ? <TypeChip value={task.type} /> : null}
+        {task.priority ? <PriorityChip value={task.priority} /> : null}
+      </Stack>
+    </Box>
+  );
+}
 
-          display: "flex",
-
-          gap: "10px",
-
-          fontSize: "12px",
-        }}
-      >
-        <span>{task.type}</span>
-
-        <span>{task.priority}</span>
-      </div>
-    </div>
+function DragHandle(props) {
+  return (
+    <Box
+      {...props}
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        color: "text.disabled",
+        cursor: "grab",
+        touchAction: "none",
+        mb: 0.5,
+        mx: -0.5,
+      }}
+    >
+      <DragIndicatorIcon fontSize="small" />
+    </Box>
   );
 }
 
 /** Static preview for <DragOverlay /> — must not call useDraggable. */
 export function TaskCardPreview({ task }) {
-  const theme = useTheme();
-  const shell = useTaskCardShellStyle({ marginBottom: 0 });
-
   return (
-    <div
-      style={{
-        ...shell,
-
+    <Card
+      sx={(theme) => ({
+        ...cardSx(theme),
         cursor: "grabbing",
-      }}
+        boxShadow: `0 8px 28px ${theme.vars.palette.forge.glow}`,
+        borderColor: "primary.main",
+      })}
     >
-      <div
-        style={{
-          marginBottom: "10px",
-
-          fontSize: "14px",
-
-          color: theme.palette.text.secondary,
-        }}
-      >
-        ☰ Drag
-      </div>
-
+      <DragHandle />
       <TaskCardBody task={task} />
-    </div>
+    </Card>
   );
 }
 
-export default function TaskCard({
-  task,
-  onClick,
-}) {
-  const theme = useTheme();
+export default function TaskCard({ task, onClick }) {
   const id = String(task._id);
 
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    isDragging,
-  } = useDraggable({
-    id,
-  });
-
-  const shell = useTaskCardShellStyle();
-
-  const style = {
-    ...shell,
-
-    transform: transform
-      ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
-      : undefined,
-
-    opacity: isDragging ? 0.35 : undefined,
-  };
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({ id });
 
   return (
-    <div ref={setNodeRef} style={style}>
-      <div
-        {...listeners}
-        {...attributes}
-        style={{
-          cursor: "grab",
-
-          marginBottom: "10px",
-
-          fontSize: "14px",
-
-          color: theme.palette.text.secondary,
-
-          touchAction: "none",
-        }}
-      >
-        ☰ Drag
-      </div>
-
+    <Card
+      ref={setNodeRef}
+      sx={cardSx}
+      style={{
+        transform: transform
+          ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
+          : undefined,
+        opacity: isDragging ? 0.35 : undefined,
+      }}
+    >
+      <DragHandle {...listeners} {...attributes} />
       <TaskCardBody task={task} onClick={onClick} />
-    </div>
+    </Card>
   );
 }

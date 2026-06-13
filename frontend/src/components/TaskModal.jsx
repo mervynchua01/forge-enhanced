@@ -196,11 +196,6 @@ export default function TaskModal({
       slotProps={{
         paper: {
           elevation: 0,
-          sx: {
-            border: "1px solid",
-            borderColor: "grey.200",
-            borderRadius: 3,
-          },
         },
       }}
     >
@@ -210,7 +205,7 @@ export default function TaskModal({
           pb: 1,
         }}
       >
-        <Typography variant="h5" fontWeight={600} color="grey.900">
+        <Typography variant="h5" component="span">
           {selectedTask ? "Edit Task" : "Create Task"}
         </Typography>
 
@@ -293,7 +288,6 @@ export default function TaskModal({
                       </Avatar>
                     }
                     label={user.username}
-                    sx={{ borderColor: "grey.300" }}
                   />
                 );
               })}

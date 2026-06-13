@@ -119,12 +119,20 @@ export function AuthProvider({ children }) {
     };
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (_event, nextSession) => {
+      (_event, nextSession) => {
         if (!mounted) return;
         setSession(nextSession);
         if (nextSession?.user) {
-          const profile = await loadProfile(nextSession.user.id);
-          setUser(profile);
+          // Defer the profile query out of this callback: supabase-js fires
+          // auth events while still holding its internal auth lock, and
+          // supabase.from() needs that same lock to attach the access token.
+          // Awaiting the query here deadlocks sign-in.
+          setTimeout(() => {
+            if (!mounted) return;
+            loadProfile(nextSession.user.id).then((profile) => {
+              if (mounted) setUser(profile);
+            });
+          }, 0);
         } else {
           setUser(null);
         }

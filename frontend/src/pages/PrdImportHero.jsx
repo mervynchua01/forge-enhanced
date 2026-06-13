@@ -15,7 +15,14 @@ import {
 } from "@mui/material";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import dayjs from "dayjs";
+
+import {
+  FORGE_GRADIENT,
+  FORGE_GRADIENT_HOVER,
+  gradientTextSx,
+} from "../styles/theme";
 
 import PrdRefinementPanel from "../components/PrdRefinementPanel";
 import { createProject, getProjects } from "../services/projectSpaceService";
@@ -204,13 +211,11 @@ export default function PrdImportHero() {
       }}
     >
       {/* Headline */}
-      <Typography
-        variant="h4"
-        fontWeight={600}
-        textAlign="center"
-        sx={{ mb: 1 }}
-      >
-        Start building your next product
+      <Typography variant="h4" textAlign="center" sx={{ mb: 1 }}>
+        Start building your{" "}
+        <Box component="span" sx={gradientTextSx}>
+          next product
+        </Box>
       </Typography>
       <Typography
         variant="body1"
@@ -230,7 +235,7 @@ export default function PrdImportHero() {
       {/* Prompt box: paste area with upload tucked inside and a circular submit. */}
       <Paper
         elevation={0}
-        sx={{
+        sx={(theme) => ({
           p: 2,
           borderRadius: 5,
           border: "1px solid",
@@ -238,10 +243,9 @@ export default function PrdImportHero() {
           transition: "border-color 0.2s ease, box-shadow 0.2s ease",
           "&:focus-within": {
             borderColor: "primary.main",
-            boxShadow: (theme) =>
-              `0 0 0 3px ${theme.palette.mode === "dark" ? "rgba(168,85,247,0.18)" : "rgba(107,33,168,0.10)"}`,
+            boxShadow: `0 0 0 3px ${theme.vars.palette.forge.glowSoft}, 0 8px 32px ${theme.vars.palette.forge.glowSoft}`,
           },
-        }}
+        })}
       >
         <InputBase
           value={prdText}
@@ -300,17 +304,22 @@ export default function PrdImportHero() {
           <IconButton
             onClick={handleGenerate}
             disabled={isGenerating || !hasInput}
-            sx={{
-              bgcolor: "primary.main",
-              color: "primary.contrastText",
+            sx={(theme) => ({
+              background: FORGE_GRADIENT,
+              color: "#ffffff",
               width: 38,
               height: 38,
-              "&:hover": { bgcolor: "primary.dark" },
+              transition: "box-shadow 0.2s ease",
+              "&:hover": {
+                background: FORGE_GRADIENT_HOVER,
+                boxShadow: `0 4px 16px ${theme.vars.palette.forge.glow}`,
+              },
               "&.Mui-disabled": {
+                background: "none",
                 bgcolor: "action.disabledBackground",
                 color: "action.disabled",
               },
-            }}
+            })}
           >
             {isGenerating ? (
               <CircularProgress size={18} color="inherit" />
@@ -320,6 +329,34 @@ export default function PrdImportHero() {
           </IconButton>
         </Box>
       </Paper>
+
+      {/* Generation feedback: pulsing sparkle while Claude works. */}
+      {isGenerating ? (
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 1,
+            mt: 2,
+            "@keyframes forgePulse": {
+              "0%, 100%": { opacity: 0.4 },
+              "50%": { opacity: 1 },
+            },
+          }}
+        >
+          <AutoAwesomeIcon
+            fontSize="small"
+            sx={{
+              color: "primary.main",
+              animation: "forgePulse 1.4s ease-in-out infinite",
+            }}
+          />
+          <Typography variant="body2" color="text.secondary">
+            Forging tickets from your PRD…
+          </Typography>
+        </Box>
+      ) : null}
 
       {/* Save-to controls, styled as a row of pills below the prompt box. */}
       <Box
